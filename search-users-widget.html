@@ -48,21 +48,20 @@ input:focus {
 </head>
 <body>
 
-<!-- Search input -->
+<!-- Search input without label -->
 <input id="userSearch" placeholder="e.g. lastname, firstname">
 <div id="autocomplete-list" class="autocomplete-items"></div>
 
 <script>
-// Your Supabase endpoint (returns all users)
+// Supabase endpoint
 const supabaseUrl = 'https://myefnonvpjbggqqurvhy.supabase.co/functions/v1/users';
 let users = [];
 
-// Fetch users from Supabase
+// Fetch users
 async function fetchUsers() {
   try {
     const res = await fetch(supabaseUrl);
     users = await res.json();
-    console.log('Users loaded:', users);
   } catch (err) {
     console.error('Error fetching users:', err);
   }
@@ -85,7 +84,7 @@ searchInput.addEventListener('input', () => {
   matches.forEach(u => {
     const item = document.createElement('div');
     item.classList.add('autocomplete-item');
-    item.textContent = u.displayname;
+    item.innerHTML = u.displayname;
     item.addEventListener('click', () => {
       searchInput.value = u.displayname;
       sendToParent(u);
@@ -123,16 +122,14 @@ function removeActive(items) {
   Array.from(items).forEach(item => item.classList.remove('active'));
 }
 
-// Send selected user data to parent JotForm
+// Send selected user to parent form
 function sendToParent(user) {
   window.parent.postMessage({ type: 'populateFields', data: user }, '*');
 }
 
-// Close autocomplete when clicking outside
+// Close dropdown when clicking outside
 document.addEventListener('click', e => {
-  if (e.target !== searchInput) {
-    autocompleteList.innerHTML = '';
-  }
+  if (e.target !== searchInput) autocompleteList.innerHTML = '';
 });
 
 // Initialize
