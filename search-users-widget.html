@@ -1,115 +1,101 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+  <meta charset="UTF-8" />
+  <title>Supabase User Search Widget</title>
   <script src="//js.jotform.com/JotFormCustomWidget.min.js"></script>
   <style>
-    body {
-      font-family: sans-serif;
-      padding: 10px;
-    }
-    input, select {
-      width: 100%;
-      padding: 8px;
-      margin-bottom: 10px;
-      box-sizing: border-box;
-    }
+    body { font-family: Arial, sans-serif; margin: 15px; }
+    input[type="text"] { width: 100%; padding: 8px; margin-bottom: 10px; }
+    select { width: 100%; padding: 8px; height: 200px; }
+    #status { font-size: 0.9em; color: #666; margin-top: 5px; }
   </style>
 </head>
 <body>
-  <h3>Employee Directory</h3>
-  <input type="text" id="searchBox" placeholder="Search by Lastname, Firstname">
-  <select id="userSelect" size="8">
-    <option value="">Loading users...</option>
-  </select>
-  <p id="status"></p>
+  <h3>Search Users</h3>
+  <input type="text" id="searchInput" placeholder="Type Lastname, Firstname..." />
+  <select id="userDropdown" size="10"></select>
+  <div id="status">Loading users...</div>
 
   <script>
-    const API_URL = "https://myefnonvpjbggqqurvhy.supabase.co/functions/v1/users";
-    let allUsers = [];
+    const apiUrl = "https://myefnonvpjbggqqurvhy.supabase.co/functions/v1/users";
+    let users = [];
 
+    // --- Load Users ---
     async function loadUsers() {
       try {
-        document.getElementById('status').textContent = "Fetching users...";
-        const res = await fetch(API_URL);
+        const res = await fetch(apiUrl);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const users = await res.json();
+        users = await res.json();
 
-        // Sort users alphabetically by last name
-        users.sort((a, b) => {
-          const aLast = a.displayname?.split(' ').pop()?.toLowerCase() || '';
-          const bLast = b.displayname?.split(' ').pop()?.toLowerCase() || '';
-          return aLast.localeCompare(bLast);
+        // Format names as "Lastname, Firstname"
+        users.forEach(u => {
+          const parts = (u.displayname || "").trim().split(" ");
+          if (parts.length >= 2) {
+            const firstname = parts.slice(0, -1).join(" ");
+            const lastname = parts[parts.length - 1];
+            u.formattedName = `${lastname}, ${firstname}`;
+          } else {
+            u.formattedName = u.displayname || "";
+          }
         });
 
-        allUsers = users;
-        renderUserList(users);
-        document.getElementById('status').textContent = `Loaded ${users.length} users.`;
-      } catch (e) {
-        document.getElementById('status').textContent = `Error loading users: ${e.message}`;
+        renderDropdown(users);
+        document.getElementById("status").textContent = `Loaded ${users.length} users`;
+      } catch (err) {
+        console.error("Error loading users:", err);
+        document.getElementById("status").textContent = "Failed to load users.";
       }
     }
 
-    // Render the dropdown list
-    function renderUserList(users) {
-      const select = document.getElementById('userSelect');
-      select.innerHTML = "";
-      if (users.length === 0) {
-        select.innerHTML = '<option value="">No matches found</option>';
-        return;
-      }
-      users.forEach(u => {
-        const opt = document.createElement('option');
-        const nameParts = u.displayname ? u.displayname.trim().split(' ') : [''];
-        const firstName = nameParts[0] || '';
-        const lastName = nameParts[nameParts.length - 1] || '';
-        opt.value = JSON.stringify(u);
-        opt.textContent = `${lastName}, ${firstName} (${u.department})`;
-        select.appendChild(opt);
+    // --- Render Dropdown List ---
+    function renderDropdown(list) {
+      const dropdown = document.getElementById("userDropdown");
+      dropdown.innerHTML = "";
+      list.forEach(u => {
+        const opt = document.createElement("option");
+        opt.value = u.mail;
+        opt.textContent = u.formattedName;
+        dropdown.appendChild(opt);
       });
     }
 
-    // Search filter
-    function filterUsers() {
-      const query = document.getElementById('searchBox').value.toLowerCase();
-      const filtered = allUsers.filter(u => {
-        const name = u.displayname ? u.displayname.toLowerCase() : '';
-        const formatted = name.split(' ').reverse().join(', ');
-        return (
-          name.includes(query) ||
-          formatted.includes(query) ||
-          (u.department && u.department.toLowerCase().includes(query))
-        );
+    // --- Search Filter ---
+    document.getElementById("searchInput").addEventListener("input", e => {
+      const term = e.target.value.toLowerCase();
+      const filtered = users.filter(u =>
+        u.formattedName.toLowerCase().includes(term)
+      );
+      renderDropdown(filtered);
+    });
+
+    // --- When user selected, send full data to Jotform instantly ---
+    document.getElementById("userDropdown").addEventListener("change", e => {
+      const selectedEmail = e.target.value;
+      const selectedUser = users.find(u => u.mail === selectedEmail);
+      if (!selectedUser) return;
+
+      // Send full JSON data to Jotform live
+      JFCustomWidget.sendData({
+        value: JSON.stringify(selectedUser)
       });
-      renderUserList(filtered);
-    }
+    });
 
-    // Send selected user data to Jotform
-    function handleSelection() {
-      const selected = document.getElementById('userSelect').value;
-      if (!selected) {
-        JFCustomWidget.sendData({ value: "" });
-        return;
-      }
-      const user = JSON.parse(selected);
-      JFCustomWidget.sendData({ value: user });
-    }
-
-    // On form submit
-    function handleSubmit() {
-      const selected = document.getElementById('userSelect').value;
-      const msg = {
-        valid: !!selected,
-        value: selected || ""
-      };
-      JFCustomWidget.sendSubmit(msg);
-    }
-
-    // Initialize widget
+    // --- Subscribe to Jotform events ---
     JFCustomWidget.subscribe("ready", function() {
+      console.log("Widget ready, loading users...");
       loadUsers();
-      document.getElementById('searchBox').addEventListener('input', filterUsers);
-      document.getElementById('userSelect').addEventListener('change', handleSelection);
-      JFCustomWidget.subscribe("submit", handleSubmit);
+    });
+
+    // On submit, still send final selected user (safety)
+    JFCustomWidget.subscribe("submit", function() {
+      const dropdown = document.getElementById("userDropdown");
+      const selected = dropdown.selectedOptions[0];
+      const selectedUser = users.find(u => u.mail === selected?.value);
+      JFCustomWidget.sendSubmit({
+        valid: !!selectedUser,
+        value: JSON.stringify(selectedUser || {})
+      });
     });
   </script>
 </body>
