@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <style>
-
+/* Input styling (matches JotForm fields) */
 input {
   font-size: 14px;
   padding: 10px;
@@ -14,22 +14,13 @@ input {
   transition: border 0.2s, box-shadow 0.2s;
 }
 
-#userSearch {
-  font-size: 14px;
-  padding: 10px;
-  width: 100%;
-  box-sizing: border-box;
-  border: 1px solid #ccc;
-  border-radius: 6px;
-  transition: border 0.2s, box-shadow 0.2s;
-}
-
-input:focus, #userSearch:focus {
+input:focus {
   border-color: #4A90E2;
   box-shadow: 0 0 5px rgba(74, 144, 226, 0.5);
   outline: none;
 }
 
+/* Autocomplete dropdown */
 .autocomplete-items {
   position: absolute;
   border: 1px solid #d4d4d4;
@@ -57,26 +48,16 @@ input:focus, #userSearch:focus {
 </head>
 <body>
 
+<!-- Search input -->
 <input id="userSearch" placeholder="e.g. lastname, firstname">
 <div id="autocomplete-list" class="autocomplete-items"></div>
 
 <script>
+// Your Supabase endpoint (returns all users)
 const supabaseUrl = 'https://myefnonvpjbggqqurvhy.supabase.co/functions/v1/users';
 let users = [];
 
-// Map your JotForm field IDs here
-const jotformFields = {
-  displayname: 'input_5',
-  mail: 'input_6',
-  jobtitle: 'input_7',
-  department: 'input_8',
-  manager: 'input_9',
-  managermail: 'input_10',
-  employeeId: 'input_11',
-  division: 'input_12'
-};
-
-// Fetch all users
+// Fetch users from Supabase
 async function fetchUsers() {
   try {
     const res = await fetch(supabaseUrl);
@@ -87,7 +68,7 @@ async function fetchUsers() {
   }
 }
 
-// Autocomplete functionality
+// Autocomplete logic
 const searchInput = document.getElementById('userSearch');
 const autocompleteList = document.getElementById('autocomplete-list');
 let currentFocus = -1;
@@ -107,18 +88,16 @@ searchInput.addEventListener('input', () => {
     item.textContent = u.displayname;
     item.addEventListener('click', () => {
       searchInput.value = u.displayname;
-      fillJotformFields(u);
+      sendToParent(u);
       autocompleteList.innerHTML = '';
     });
     autocompleteList.appendChild(item);
   });
-
-  console.log('Matches for search term:', term, matches);
 });
 
 // Keyboard navigation
 searchInput.addEventListener('keydown', (e) => {
-  let items = autocompleteList.getElementsByClassName('autocomplete-item');
+  const items = autocompleteList.getElementsByClassName('autocomplete-item');
   if (!items) return;
 
   if (e.key === 'ArrowDown') {
@@ -129,14 +108,11 @@ searchInput.addEventListener('keydown', (e) => {
     addActive(items);
   } else if (e.key === 'Enter') {
     e.preventDefault();
-    if (currentFocus > -1 && items[currentFocus]) {
-      items[currentFocus].click();
-    }
+    if (currentFocus > -1 && items[currentFocus]) items[currentFocus].click();
   }
 });
 
 function addActive(items) {
-  if (!items) return;
   removeActive(items);
   if (currentFocus >= items.length) currentFocus = 0;
   if (currentFocus < 0) currentFocus = items.length - 1;
@@ -147,15 +123,9 @@ function removeActive(items) {
   Array.from(items).forEach(item => item.classList.remove('active'));
 }
 
-// Fill Jotform fields dynamically
-function fillJotformFields(user) {
-  console.log('Selected user:', user);
-  Object.entries(jotformFields).forEach(([key, fieldId]) => {
-    const field = document.querySelector(`#${fieldId}`);
-    if (field) {
-      field.value = user[key] || '';
-    }
-  });
+// Send selected user data to parent JotForm
+function sendToParent(user) {
+  window.parent.postMessage({ type: 'populateFields', data: user }, '*');
 }
 
 // Close autocomplete when clicking outside
