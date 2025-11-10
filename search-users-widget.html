@@ -1,140 +1,149 @@
 <!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<style>
-/* Input styling (matches JotForm fields) */
-input {
-  font-size: 14px;
-  padding: 10px;
-  width: 100%;
-  box-sizing: border-box;
-  border: 1px solid #ccc;
-  border-radius: 6px;
-  transition: border 0.2s, box-shadow 0.2s;
-}
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <title>Search Users Widget</title>
+    <script src="https://js.jotform.com/JotFormCustomWidget.min.js"></script>
+    <style>
+      body {
+        font-family: Inter, Arial, sans-serif;
+        background: #fff;
+        margin: 0;
+        padding: 10px;
+        color: #333;
+      }
+      .search-container {
+        position: relative;
+        width: 100%;
+      }
+      input {
+        width: 100%;
+        padding: 10px;
+        border: 1px solid #ccc;
+        border-radius: 6px;
+        font-size: 14px;
+      }
+      ul {
+        list-style: none;
+        position: absolute;
+        background: white;
+        border: 1px solid #ccc;
+        border-top: none;
+        width: 100%;
+        max-height: 180px;
+        overflow-y: auto;
+        border-radius: 0 0 6px 6px;
+        z-index: 999;
+        margin: 0;
+        padding: 0;
+      }
+      li {
+        padding: 10px;
+        cursor: pointer;
+        border-bottom: 1px solid #eee;
+      }
+      li:hover {
+        background: #f1f1f1;
+      }
+      .info {
+        margin-top: 10px;
+        font-size: 14px;
+        color: #444;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="search-container">
+      <input type="text" id="search" placeholder="Search employee (Last, First)" autocomplete="off" />
+      <ul id="results"></ul>
+    </div>
+    <div id="user-info" class="info"></div>
 
-input:focus {
-  border-color: #4A90E2;
-  box-shadow: 0 0 5px rgba(74, 144, 226, 0.5);
-  outline: none;
-}
+    <script>
+      const API_URL = "https://myefnonvpjbggqqurvhy.supabase.co/functions/v1/users";
 
-/* Autocomplete dropdown */
-.autocomplete-items {
-  position: absolute;
-  border: 1px solid #d4d4d4;
-  border-top: none;
-  z-index: 1000;
-  background-color: #fff;
-  max-height: 250px;
-  overflow-y: auto;
-  border-radius: 0 0 6px 6px;
-  box-shadow: 0 4px 10px rgba(0,0,0,0.1);
-}
+      let allUsers = [];
 
-.autocomplete-item {
-  padding: 10px 12px;
-  cursor: pointer;
-  transition: background-color 0.2s;
-}
+      // Load users from Supabase function
+      async function loadUsers() {
+        try {
+          const res = await fetch(API_URL);
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          allUsers = await res.json();
+          console.log("✅ Users loaded:", allUsers.length);
+        } catch (err) {
+          console.error("❌ Error loading users:", err);
+        }
+      }
 
-.autocomplete-item:hover, .autocomplete-item.active {
-  background-color: #f0f8ff;
-  color: #333;
-  font-weight: 500;
-}
-</style>
-</head>
-<body>
+      // Render search results
+      function renderResults(results) {
+        const ul = document.getElementById("results");
+        ul.innerHTML = "";
+        results.forEach((user) => {
+          const li = document.createElement("li");
+          li.textContent = `${user.displayname}`;
+          li.addEventListener("click", () => selectUser(user));
+          ul.appendChild(li);
+        });
+      }
 
-<!-- Search input without label -->
-<input id="userSearch" placeholder="e.g. lastname, firstname">
-<div id="autocomplete-list" class="autocomplete-items"></div>
+      // Select user
+      function selectUser(user) {
+        document.getElementById("search").value = user.displayname;
+        document.getElementById("results").innerHTML = "";
 
-<script>
-// Supabase endpoint
-const supabaseUrl = 'https://myefnonvpjbggqqurvhy.supabase.co/functions/v1/users';
-let users = [];
+        // Display all info
+        document.getElementById("user-info").innerHTML = `
+          <strong>${user.displayname}</strong><br>
+          <b>Email:</b> ${user.mail}<br>
+          <b>Job Title:</b> ${user.jobtitle}<br>
+          <b>Department:</b> ${user.department}<br>
+          <b>Manager:</b> ${user.manager}<br>
+          <b>Manager Email:</b> ${user.managermail}<br>
+          <b>Employee ID:</b> ${user.employeeId}<br>
+          <b>Division:</b> ${user.division}
+        `;
 
-// Fetch users
-async function fetchUsers() {
-  try {
-    const res = await fetch(supabaseUrl);
-    users = await res.json();
-  } catch (err) {
-    console.error('Error fetching users:', err);
-  }
-}
+        console.log("👤 Selected User:", user);
 
-// Autocomplete logic
-const searchInput = document.getElementById('userSearch');
-const autocompleteList = document.getElementById('autocomplete-list');
-let currentFocus = -1;
+        // Send data to Jotform fields
+        JFCustomWidget.sendData({
+          value: JSON.stringify(user)
+        });
+      }
 
-searchInput.addEventListener('input', () => {
-  const term = searchInput.value.trim().toLowerCase();
-  autocompleteList.innerHTML = '';
-  currentFocus = -1;
+      // Handle search
+      document.getElementById("search").addEventListener("input", (e) => {
+        const query = e.target.value.toLowerCase();
+        if (!query) {
+          document.getElementById("results").innerHTML = "";
+          return;
+        }
 
-  if (!term) return;
+        const results = allUsers.filter((u) =>
+          u.displayname.toLowerCase().includes(query)
+        );
+        renderResults(results.slice(0, 10)); // limit 10 results
+      });
 
-  const matches = users.filter(u => u.displayname.toLowerCase().includes(term));
+      // Initialize widget
+      JFCustomWidget.subscribe("ready", function () {
+        console.log("🔌 Jotform widget ready");
+        loadUsers();
+      });
 
-  matches.forEach(u => {
-    const item = document.createElement('div');
-    item.classList.add('autocomplete-item');
-    item.innerHTML = u.displayname;
-    item.addEventListener('click', () => {
-      searchInput.value = u.displayname;
-      sendToParent(u);
-      autocompleteList.innerHTML = '';
-    });
-    autocompleteList.appendChild(item);
-  });
-});
-
-// Keyboard navigation
-searchInput.addEventListener('keydown', (e) => {
-  const items = autocompleteList.getElementsByClassName('autocomplete-item');
-  if (!items) return;
-
-  if (e.key === 'ArrowDown') {
-    currentFocus++;
-    addActive(items);
-  } else if (e.key === 'ArrowUp') {
-    currentFocus--;
-    addActive(items);
-  } else if (e.key === 'Enter') {
-    e.preventDefault();
-    if (currentFocus > -1 && items[currentFocus]) items[currentFocus].click();
-  }
-});
-
-function addActive(items) {
-  removeActive(items);
-  if (currentFocus >= items.length) currentFocus = 0;
-  if (currentFocus < 0) currentFocus = items.length - 1;
-  items[currentFocus].classList.add('active');
-}
-
-function removeActive(items) {
-  Array.from(items).forEach(item => item.classList.remove('active'));
-}
-
-// Send selected user to parent form
-function sendToParent(user) {
-  window.parent.postMessage({ type: 'populateFields', data: user }, '*');
-}
-
-// Close dropdown when clicking outside
-document.addEventListener('click', e => {
-  if (e.target !== searchInput) autocompleteList.innerHTML = '';
-});
-
-// Initialize
-fetchUsers();
-</script>
-
-</body>
+      // Handle form submission
+      JFCustomWidget.subscribe("submit", function () {
+        const value = document.getElementById("search").value;
+        const found = allUsers.find((u) => u.displayname === value);
+        const msg = {
+          valid: true,
+          value: found ? JSON.stringify(found) : ""
+        };
+        console.log("📤 Sending to Jotform:", msg);
+        JFCustomWidget.sendSubmit(msg);
+      });
+    </script>
+  </body>
 </html>
