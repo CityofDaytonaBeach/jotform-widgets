@@ -3,18 +3,27 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Employee Lookup Widget</title>
-
-<!-- Load Jotform’s Widget API -->
+<title>Employee Lookup (HIPAA Multi-Stage)</title>
 <script src="https://js.jotform.com/JotFormCustomWidget.min.js"></script>
-
-<!-- Load external CSS and JS (CSP-safe) -->
 <link rel="stylesheet" href="widget.css">
 <script src="widget.js" defer></script>
 </head>
 <body>
-  <div id="resultsContainer">
+  <div id="widgetContainer">
     <input type="text" id="searchUser" placeholder="Search employee..." autocomplete="off" />
+    <div id="dropdown" class="dropdown"></div>
+
+    <div id="details" class="hidden">
+      <h4>Selected Employee</h4>
+      <div class="field"><label>Name:</label><span id="displayname"></span></div>
+      <div class="field"><label>Email:</label><span id="mail"></span></div>
+      <div class="field"><label>Job Title:</label><span id="jobtitle"></span></div>
+      <div class="field"><label>Department:</label><span id="department"></span></div>
+      <div class="field"><label>Manager:</label><span id="manager"></span></div>
+      <div class="field"><label>Manager Email:</label><span id="managermail"></span></div>
+      <div class="field"><label>Employee ID:</label><span id="employeeId"></span></div>
+      <div class="field"><label>Division:</label><span id="division"></span></div>
+    </div>
   </div>
 </body>
 </html>
