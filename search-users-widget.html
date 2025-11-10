@@ -12,11 +12,12 @@
         font-family: Inter, Arial, sans-serif;
         font-size: 14px;
         color: #333;
+        overflow: hidden;
       }
 
       .search-container {
-        width: 100%;
         position: relative;
+        width: 100%;
       }
 
       input {
@@ -28,20 +29,21 @@
         box-sizing: border-box;
       }
 
-      ul {
+      ul#results {
         list-style: none;
+        margin: 0;
+        padding: 0;
         position: absolute;
         top: 100%;
         left: 0;
         right: 0;
-        background: white;
+        background: #fff;
         border: 1px solid #ccc;
         border-top: none;
-        max-height: 200px;
+        max-height: 180px;
         overflow-y: auto;
-        margin: 0;
-        padding: 0;
-        z-index: 999;
+        z-index: 9999;
+        display: none;
       }
 
       li {
@@ -73,7 +75,6 @@
       const API_URL = "https://myefnonvpjbggqqurvhy.supabase.co/functions/v1/users";
       let allUsers = [];
 
-      // Load users once
       async function loadUsers() {
         try {
           const res = await fetch(API_URL);
@@ -88,19 +89,25 @@
       function renderResults(results) {
         const ul = document.getElementById("results");
         ul.innerHTML = "";
+        if (!results.length) {
+          ul.style.display = "none";
+          return;
+        }
+
         results.forEach((user) => {
           const li = document.createElement("li");
-          li.textContent = `${user.displayname}`;
+          li.textContent = user.displayname;
           li.onclick = () => selectUser(user);
           ul.appendChild(li);
         });
-        ul.style.display = results.length ? "block" : "none";
+
+        ul.style.display = "block";
       }
 
       function selectUser(user) {
         const searchInput = document.getElementById("search");
         searchInput.value = user.displayname;
-        document.getElementById("results").innerHTML = "";
+        document.getElementById("results").style.display = "none";
         document.getElementById("user-info").innerHTML = `
           <b>${user.displayname}</b><br>
           ${user.mail || ""} • ${user.jobtitle || ""} • ${user.department || ""}
@@ -113,17 +120,19 @@
           value: JSON.stringify(user)
         });
 
-        // Try to autofill Jotform fields if accessible
+        // Try to autofill Jotform fields
         try {
           const parent = window.parent.document;
 
           const map = {
-            "#input_5": user.mail,
-            "#input_6": user.jobtitle,
-            "#input_7": user.department,
-            "#input_8": user.manager,
-            "#input_9": user.managermail,
-            "#input_10": user.employeeId
+            "#input_5": user.displayname,
+            "#input_6": user.mail,
+            "#input_7": user.jobtitle,
+            "#input_8": user.department,
+            "#input_9": user.manager,
+            "#input_10": user.managermail,
+            "#input_11": user.employeeId,
+            "#input_12": user.division
           };
 
           for (const [selector, value] of Object.entries(map)) {
@@ -132,25 +141,30 @@
               field.value = value;
               field.dispatchEvent(new Event("input", { bubbles: true }));
               console.log(`✅ Filled ${selector} = ${value}`);
-            } else {
-              console.log(`⚠️ Field ${selector} not found or empty value`);
             }
           }
         } catch (err) {
-          console.warn("⚠️ Could not access parent fields:", err);
+          console.warn("⚠️ Could not autofill parent form fields:", err);
         }
       }
 
       document.getElementById("search").addEventListener("input", (e) => {
         const query = e.target.value.trim().toLowerCase();
         if (!query) {
-          document.getElementById("results").innerHTML = "";
+          document.getElementById("results").style.display = "none";
           return;
         }
+
         const results = allUsers.filter((u) =>
-          u.displayname.toLowerCase().includes(query)
+          (u.displayname || "").toLowerCase().includes(query)
         );
         renderResults(results.slice(0, 10));
+      });
+
+      document.addEventListener("click", (e) => {
+        if (!e.target.closest(".search-container")) {
+          document.getElementById("results").style.display = "none";
+        }
       });
 
       // Jotform Widget Lifecycle
@@ -161,7 +175,9 @@
 
       JFCustomWidget.subscribe("submit", function () {
         const value = document.getElementById("search").value;
-        const found = allUsers.find((u) => u.displayname === value);
+        const found = allUsers.find(
+          (u) => (u.displayname || "").toLowerCase() === value.toLowerCase()
+        );
         JFCustomWidget.sendSubmit({
           valid: true,
           value: found ? JSON.stringify(found) : ""
