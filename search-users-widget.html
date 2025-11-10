@@ -104,23 +104,7 @@ searchInput.addEventListener("input", (e) => {
       dropdown.remove();
       console.log("✅ Selected user:", u);
 
-      // Autofill Jotform fields
-      const fields = {
-        "#input_5": u.displayname,
-        "#input_6": u.mail,
-        "#input_7": u.jobtitle,
-        "#input_8": u.department,
-        "#input_9": u.manager,
-        "#input_10": u.managermail,
-        "#input_11": u.employeeId,
-        "#input_12": u.division
-      };
-      for (const [sel, val] of Object.entries(fields)) {
-        const el = parent.document.querySelector(sel);
-        if (el) el.value = val || "";
-      }
-
-      // Send data back to Jotform
+      // Send all user data to Jotform safely
       sendWidgetData({ valid: true, value: JSON.stringify(u) });
     });
     dropdown.appendChild(item);
