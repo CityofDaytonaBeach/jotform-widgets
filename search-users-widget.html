@@ -56,14 +56,13 @@ console.clear();
 console.log("🔍 Loading Employee Lookup Widget...");
 
 // ===== CONFIG =====
-const API_URL = "https://myefnonvpjbggqqurvhy.supabase.co/functions/v1/users"; // your Supabase endpoint
-const JOTFORM_ORIGIN = "https://hipaa.jotform.com"; // target live form origin
+const API_URL = "https://myefnonvpjbggqqurvhy.supabase.co/functions/v1/users"; // Supabase endpoint
 let users = [];
 
 const searchInput = document.getElementById("searchUser");
 const resultsContainer = document.getElementById("resultsContainer");
 
-// ===== UTILITIES =====
+// ===== SAFE DATA SEND =====
 function sendWidgetData(data) {
   try {
     if (window.JFCustomWidget) JFCustomWidget.sendData(data);
@@ -72,7 +71,7 @@ function sendWidgetData(data) {
   }
 }
 
-// ===== AUTOFILL FORM FIELDS =====
+// ===== AUTOFILL JOTFORM FIELDS =====
 function fillFormFields(user) {
   const fieldMappings = {
     'input_5': user.displayname || '',
@@ -85,18 +84,24 @@ function fillFormFields(user) {
     'input_12': user.division || ''
   };
 
-  Object.keys(fieldMappings).forEach(fieldId => {
-    window.parent.postMessage({
-      type: 'populate',
-      qid: fieldId,
-      value: fieldMappings[fieldId]
-    }, JOTFORM_ORIGIN);
+  Object.entries(fieldMappings).forEach(([fieldId, value]) => {
+    try {
+      if (window.JFCustomWidget && typeof JFCustomWidget.setFieldValue === "function") {
+        // HIPAA-safe internal API call
+        JFCustomWidget.setFieldValue(fieldId, value);
+      } else {
+        // Non-HIPAA fallback
+        window.parent.postMessage({ type: 'populate', qid: fieldId, value }, '*');
+      }
+    } catch (err) {
+      console.warn("⚠ Failed to set field:", fieldId, err);
+    }
   });
 
   console.log("✅ Sent field data to parent form:", fieldMappings);
 }
 
-// ===== LOAD USERS =====
+// ===== LOAD USERS FROM SUPABASE =====
 async function loadUsers() {
   try {
     const res = await fetch(API_URL);
@@ -110,7 +115,7 @@ async function loadUsers() {
 
 loadUsers();
 
-// ===== AUTOCOMPLETE BEHAVIOR =====
+// ===== AUTOCOMPLETE DROPDOWN =====
 searchInput.addEventListener("input", (e) => {
   const query = e.target.value.trim().toLowerCase();
   resultsContainer.querySelectorAll(".dropdown").forEach(d => d.remove());
@@ -142,14 +147,14 @@ searchInput.addEventListener("input", (e) => {
   resultsContainer.appendChild(dropdown);
 });
 
-// ===== CLICK OUTSIDE CLOSE =====
+// ===== CLICK OUTSIDE TO CLOSE =====
 document.addEventListener("click", (e) => {
   if (!resultsContainer.contains(e.target) && e.target !== searchInput) {
     resultsContainer.querySelectorAll(".dropdown").forEach(d => d.remove());
   }
 });
 
-// ===== JOTFORM READY EVENT =====
+// ===== JOTFORM WIDGET READY =====
 if (window.JFCustomWidget) {
   JFCustomWidget.subscribe("ready", function() {
     console.log("✅ Jotform Widget Ready");
