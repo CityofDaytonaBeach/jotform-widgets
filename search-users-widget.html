@@ -32,13 +32,36 @@ const resultsContainer = document.getElementById("resultsContainer");
 console.clear();
 console.log("🔍 Loading User Search Widget...");
 
-// Send JSON to Jotform widget value safely
 function sendWidgetData(data) {
   try { if (window.JFCustomWidget) { JFCustomWidget.sendData(data); } }
   catch(err) { console.warn("⚠ sendData failed:", err); }
 }
 
-// Fetch users from Supabase function
+// Function to fill form fields via postMessage
+function fillFormFields(user) {
+  const fieldMappings = {
+    'input_5': user.displayname || '',
+    'input_6': user.mail || '',
+    'input_7': user.jobtitle || '',
+    'input_8': user.department || '',
+    'input_9': user.manager || '',
+    'input_10': user.managermail || '',
+    'input_11': user.employeeId || '',
+    'input_12': user.division || ''
+  };
+
+  // Send via postMessage to parent
+  Object.keys(fieldMappings).forEach(fieldId => {
+    window.parent.postMessage({
+      type: 'populate',
+      qid: fieldId,
+      value: fieldMappings[fieldId]
+    }, '*');
+  });
+
+  console.log("✅ Sent field data to parent form:", fieldMappings);
+}
+
 async function loadUsers() {
   try {
     const res = await fetch(API_URL);
@@ -51,7 +74,6 @@ async function loadUsers() {
 
 loadUsers();
 
-// Show autocomplete dropdown
 searchInput.addEventListener("input", (e) => {
   const query = e.target.value.trim().toLowerCase();
   resultsContainer.querySelectorAll(".dropdown").forEach(d => d.remove());
@@ -72,7 +94,10 @@ searchInput.addEventListener("input", (e) => {
       dropdown.remove();
       console.log("✅ Selected user:", u);
 
-      // Send full JSON to Jotform widget value
+      // Fill form fields directly
+      fillFormFields(u);
+
+      // Also send to widget value
       sendWidgetData({ valid: true, value: JSON.stringify(u) });
     });
     dropdown.appendChild(item);
@@ -81,18 +106,16 @@ searchInput.addEventListener("input", (e) => {
   resultsContainer.appendChild(dropdown);
 });
 
-// Remove dropdown if clicked outside
 document.addEventListener("click", (e) => {
   if (!resultsContainer.contains(e.target) && e.target !== searchInput) {
     resultsContainer.querySelectorAll(".dropdown").forEach(d => d.remove());
   }
 });
 
-// Jotform widget ready event
 if (window.JFCustomWidget) {
   JFCustomWidget.subscribe("ready", function() {
     console.log("✅ Jotform Widget Ready");
-    sendWidgetData({ valid: true, value: "" }); // Initialize empty value
+    sendWidgetData({ valid: true, value: "" });
   });
 }
 </script>
