@@ -5,50 +5,60 @@
     <title>Search Users Widget</title>
     <script src="https://js.jotform.com/JotFormCustomWidget.min.js"></script>
     <style>
-      body {
-        font-family: Inter, Arial, sans-serif;
+      html, body {
+        margin: 0 !important;
+        padding: 0 !important;
         background: #fff;
-        margin: 0;
-        padding: 10px;
+        font-family: Inter, Arial, sans-serif;
+        font-size: 14px;
         color: #333;
       }
+
       .search-container {
-        position: relative;
         width: 100%;
+        position: relative;
       }
+
       input {
         width: 100%;
-        padding: 10px;
+        padding: 8px;
         border: 1px solid #ccc;
-        border-radius: 6px;
+        border-radius: 4px;
         font-size: 14px;
+        box-sizing: border-box;
       }
+
       ul {
         list-style: none;
         position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
         background: white;
         border: 1px solid #ccc;
         border-top: none;
-        width: 100%;
-        max-height: 180px;
+        max-height: 200px;
         overflow-y: auto;
-        border-radius: 0 0 6px 6px;
-        z-index: 999;
         margin: 0;
         padding: 0;
+        z-index: 999;
       }
+
       li {
-        padding: 10px;
+        padding: 8px;
         cursor: pointer;
         border-bottom: 1px solid #eee;
       }
+
       li:hover {
-        background: #f1f1f1;
+        background: #f0f0f0;
       }
+
       .info {
-        margin-top: 10px;
-        font-size: 14px;
+        font-size: 13px;
         color: #444;
+        margin-top: 4px;
+        line-height: 1.4em;
       }
     </style>
   </head>
@@ -61,88 +71,101 @@
 
     <script>
       const API_URL = "https://myefnonvpjbggqqurvhy.supabase.co/functions/v1/users";
-
       let allUsers = [];
 
-      // Load users from Supabase function
+      // Load users once
       async function loadUsers() {
         try {
           const res = await fetch(API_URL);
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
           allUsers = await res.json();
-          console.log("✅ Users loaded:", allUsers.length);
+          console.log(`✅ Loaded ${allUsers.length} users`);
         } catch (err) {
           console.error("❌ Error loading users:", err);
         }
       }
 
-      // Render search results
       function renderResults(results) {
         const ul = document.getElementById("results");
         ul.innerHTML = "";
         results.forEach((user) => {
           const li = document.createElement("li");
           li.textContent = `${user.displayname}`;
-          li.addEventListener("click", () => selectUser(user));
+          li.onclick = () => selectUser(user);
           ul.appendChild(li);
         });
+        ul.style.display = results.length ? "block" : "none";
       }
 
-      // Select user
       function selectUser(user) {
-        document.getElementById("search").value = user.displayname;
+        const searchInput = document.getElementById("search");
+        searchInput.value = user.displayname;
         document.getElementById("results").innerHTML = "";
-
-        // Display all info
         document.getElementById("user-info").innerHTML = `
-          <strong>${user.displayname}</strong><br>
-          <b>Email:</b> ${user.mail}<br>
-          <b>Job Title:</b> ${user.jobtitle}<br>
-          <b>Department:</b> ${user.department}<br>
-          <b>Manager:</b> ${user.manager}<br>
-          <b>Manager Email:</b> ${user.managermail}<br>
-          <b>Employee ID:</b> ${user.employeeId}<br>
-          <b>Division:</b> ${user.division}
+          <b>${user.displayname}</b><br>
+          ${user.mail || ""} • ${user.jobtitle || ""} • ${user.department || ""}
         `;
 
         console.log("👤 Selected User:", user);
 
-        // Send data to Jotform fields
+        // Send JSON to Jotform backend
         JFCustomWidget.sendData({
           value: JSON.stringify(user)
         });
+
+        // Try to autofill Jotform fields if accessible
+        try {
+          const parent = window.parent.document;
+
+          const map = {
+            "#input_5": user.mail,
+            "#input_6": user.jobtitle,
+            "#input_7": user.department,
+            "#input_8": user.manager,
+            "#input_9": user.managermail,
+            "#input_10": user.employeeId
+          };
+
+          for (const [selector, value] of Object.entries(map)) {
+            const field = parent.querySelector(selector);
+            if (field && value) {
+              field.value = value;
+              field.dispatchEvent(new Event("input", { bubbles: true }));
+              console.log(`✅ Filled ${selector} = ${value}`);
+            } else {
+              console.log(`⚠️ Field ${selector} not found or empty value`);
+            }
+          }
+        } catch (err) {
+          console.warn("⚠️ Could not access parent fields:", err);
+        }
       }
 
-      // Handle search
       document.getElementById("search").addEventListener("input", (e) => {
-        const query = e.target.value.toLowerCase();
+        const query = e.target.value.trim().toLowerCase();
         if (!query) {
           document.getElementById("results").innerHTML = "";
           return;
         }
-
         const results = allUsers.filter((u) =>
           u.displayname.toLowerCase().includes(query)
         );
-        renderResults(results.slice(0, 10)); // limit 10 results
+        renderResults(results.slice(0, 10));
       });
 
-      // Initialize widget
-      JFCustomWidget.subscribe("ready", function () {
-        console.log("🔌 Jotform widget ready");
-        loadUsers();
+      // Jotform Widget Lifecycle
+      JFCustomWidget.subscribe("ready", async function () {
+        console.log("🔌 Widget ready");
+        await loadUsers();
       });
 
-      // Handle form submission
       JFCustomWidget.subscribe("submit", function () {
         const value = document.getElementById("search").value;
         const found = allUsers.find((u) => u.displayname === value);
-        const msg = {
+        JFCustomWidget.sendSubmit({
           valid: true,
           value: found ? JSON.stringify(found) : ""
-        };
-        console.log("📤 Sending to Jotform:", msg);
-        JFCustomWidget.sendSubmit(msg);
+        });
       });
     </script>
   </body>
