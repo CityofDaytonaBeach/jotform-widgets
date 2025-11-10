@@ -6,40 +6,16 @@
 <title>User Search Widget</title>
 <script src="https://js.jotform.com/JotFormCustomWidget.min.js"></script>
 <style>
-  body {
-    margin: 0;
-    padding: 0;
-    font-family: Arial, sans-serif;
-  }
-  #resultsContainer {
-    position: relative;
-    width: 100%;
-  }
-  #searchUser {
-    width: 100%;
-    padding: 4px;
-    margin: 0;
-    box-sizing: border-box;
-  }
+  body { margin:0; padding:0; font-family: Arial, sans-serif; }
+  #resultsContainer { position: relative; width: 100%; }
+  #searchUser { width: 100%; padding: 4px; margin: 0; box-sizing: border-box; }
   .dropdown {
-    position: absolute;
-    top: 100%;
-    left: 0;
-    right: 0;
-    background: #fff;
-    border: 1px solid #ccc;
-    z-index: 9999;
-    max-height: 180px;
-    overflow-y: auto;
+    position: absolute; top: 100%; left: 0; right: 0;
+    background: #fff; border: 1px solid #ccc; z-index: 9999;
+    max-height: 180px; overflow-y: auto;
   }
-  .dropdown-item {
-    cursor: pointer;
-    padding: 2px 4px;
-    margin: 0;
-  }
-  .dropdown-item:hover {
-    background: #f0f0f0;
-  }
+  .dropdown-item { cursor: pointer; padding: 2px 4px; margin: 0; }
+  .dropdown-item:hover { background: #f0f0f0; }
 </style>
 </head>
 <body>
@@ -56,15 +32,10 @@ const resultsContainer = document.getElementById("resultsContainer");
 console.clear();
 console.log("🔍 Loading User Search Widget...");
 
-// Safe sendData wrapper
+// Send JSON to Jotform widget value safely
 function sendWidgetData(data) {
-  try {
-    if (window.JFCustomWidget) {
-      JFCustomWidget.sendData(data);
-    }
-  } catch (err) {
-    console.warn("⚠️ sendData failed (likely preview mode):", err);
-  }
+  try { if (window.JFCustomWidget) { JFCustomWidget.sendData(data); } }
+  catch(err) { console.warn("⚠ sendData failed:", err); }
 }
 
 // Fetch users from Supabase function
@@ -80,16 +51,13 @@ async function loadUsers() {
 
 loadUsers();
 
-// Listen for input
+// Show autocomplete dropdown
 searchInput.addEventListener("input", (e) => {
   const query = e.target.value.trim().toLowerCase();
   resultsContainer.querySelectorAll(".dropdown").forEach(d => d.remove());
   if (!query) return;
 
-  const matches = users.filter(u =>
-    (u.displayname || "").toLowerCase().includes(query)
-  ).slice(0, 8);
-
+  const matches = users.filter(u => (u.displayname||"").toLowerCase().includes(query)).slice(0,8);
   if (matches.length === 0) return;
 
   const dropdown = document.createElement("div");
@@ -104,7 +72,7 @@ searchInput.addEventListener("input", (e) => {
       dropdown.remove();
       console.log("✅ Selected user:", u);
 
-      // Send all user data to Jotform safely
+      // Send full JSON to Jotform widget value
       sendWidgetData({ valid: true, value: JSON.stringify(u) });
     });
     dropdown.appendChild(item);
@@ -122,10 +90,9 @@ document.addEventListener("click", (e) => {
 
 // Jotform widget ready event
 if (window.JFCustomWidget) {
-  JFCustomWidget.subscribe("ready", function(msg) {
+  JFCustomWidget.subscribe("ready", function() {
     console.log("✅ Jotform Widget Ready");
-    // Initialize empty data
-    sendWidgetData({ valid: true, value: "" });
+    sendWidgetData({ valid: true, value: "" }); // Initialize empty value
   });
 }
 </script>
