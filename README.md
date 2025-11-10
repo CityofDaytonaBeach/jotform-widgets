@@ -17,7 +17,7 @@ Each widget is a standalone **HTML/JavaScript file** hosted on GitHub Pages (or 
 
 | Widget File | Description |
 |--------------|-------------|
-| `search-users-widget.html` | Fetches user data from a Supabase Edge Function connected to the Microsoft Graph API. Allows searching by last name, first name (`Lastname, Firstname` format) and auto-fills Jotform fields. |
+| `<a href="https://cityofdaytonabeach.github.io/jotform-widgets/search>search-users-widget.html</a>` | Fetches user data from a Supabase Edge Function connected to the Microsoft Graph API. Allows searching by last name, first name (`Lastname, Firstname` format) and auto-fills Jotform fields. |
 
 ---
 
