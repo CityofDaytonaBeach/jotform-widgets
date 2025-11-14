@@ -7,7 +7,7 @@ body {
 #resultsContainer {
   position: relative;
   width: 100%;
-  overflow: visible; /* prevent clipping */
+  overflow: visible;
 }
 
 #searchUser {
