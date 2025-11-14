@@ -1,162 +1,138 @@
-<!doctype html>
+<!DOCTYPE html>
 <html>
 <head>
-  <script src="//js.jotform.com/JotFormCustomWidget.min.js"></script>
+  <meta charset="UTF-8">
+  <title>Employee Search Dropdown</title>
+
   <style>
-    html, body {
-      margin: 0;
-      padding: 0;
+    #searchBox {
       width: 100%;
-      height: auto;
-      overflow: visible;
-      font-family: Arial, sans-serif;
+      padding: 10px;
+      margin-bottom: 5px;
+      font-size: 15px;
+      box-sizing: border-box;
+    }
+
+    #resultList {
+      width: 100%;
+      max-height: 200px;
+      border: 1px solid #ccc;
+      border-top: none;
+      background: white;
+      overflow-y: auto;
+      display: none;
+      position: absolute;
+      z-index: 9999;
+    }
+
+    .result-item {
+      padding: 10px;
+      cursor: pointer;
+      border-bottom: 1px solid #eee;
+    }
+
+    .result-item:hover {
+      background: #f4f4f4;
+    }
+
+    .wrapper {
+      position: relative;
+      width: 100%;
     }
   </style>
 </head>
 
 <body>
 
+<div class="wrapper">
+  <input type="text" id="searchBox" placeholder="Search by first or last name...">
+  <div id="resultList"></div>
+</div>
+
 <script>
-const API_URL = "https://myefnonvpjbggqqurvhy.supabase.co/functions/v1/users";
+  /* ----------------------------------------------------------
+     Load employees from Supabase Edge Function
+  ---------------------------------------------------------- */
+  async function loadEmployees() {
+    try {
+      const res = await fetch("https://myefnonvpjbggqqurvhy.supabase.co/functions/v1/users", {
+        method: "GET",
+        headers: { "Content-Type": "application/json" }
+      });
 
-let users = [];
-let selectedEmployee = null;
+      const data = await res.json();
 
-// Load Supabase employees
-async function loadUsers() {
-  const res = await fetch(API_URL);
-  users = await res.json();
-  console.log("Loaded employees:", users.length);
-}
+      console.log("🔍 Loaded employee dataset:", data);
 
-// Build widget UI inside Jotform’s approved container
-function buildUI() {
-  const root = JFCustomWidget.getContainer();
-  root.style.width = "100%";
-  root.style.padding = "6px";
+      return data;
+    } catch (e) {
+      console.error("Error loading employees:", e);
+      return [];
+    }
+  }
 
-  const input = document.createElement("input");
-  input.id = "empSearch";
-  input.placeholder = "Search employee...";
-  input.style.width = "100%";
-  input.style.padding = "8px";
-  input.style.border = "1px solid #ccc";
-  input.style.borderRadius = "4px";
+  /* ----------------------------------------------------------
+     Build interactive search dropdown
+  ---------------------------------------------------------- */
+  async function initSearch() {
+    const employees = await loadEmployees();
 
-  const dropdown = document.createElement("div");
-  dropdown.id = "dropdown";
-  dropdown.style.position = "relative";
+    const searchBox = document.getElementById("searchBox");
+    const resultList = document.getElementById("resultList");
 
-  root.appendChild(input);
-  root.appendChild(dropdown);
+    searchBox.addEventListener("input", () => {
+      const query = searchBox.value.toLowerCase().trim();
+      resultList.innerHTML = "";
 
-  input.addEventListener("input", () => {
-    const query = input.value.toLowerCase().trim();
-    if (!query) return dropdown.innerHTML = "";
+      if (!query) {
+        resultList.style.display = "none";
+        return;
+      }
 
-    const matches = users.filter(u =>
-      (u.displayname || "").toLowerCase().includes(query)
-    ).slice(0, 10);
+      const filtered = employees.filter(emp =>
+        emp.displayname.toLowerCase().includes(query)
+      );
 
-    renderDropdown(matches);
-  });
-}
+      filtered.forEach(emp => {
+        const div = document.createElement("div");
+        div.classList.add("result-item");
+        div.textContent = emp.displayname;
 
-// Build dropdown list
-function renderDropdown(matches) {
-  const dropdown = document.getElementById("dropdown");
-  dropdown.innerHTML = "";
+        div.onclick = () => {
+          searchBox.value = emp.displayname;
+          resultList.style.display = "none";
 
-  const list = document.createElement("div");
-  list.style.position = "absolute";
-  list.style.top = "100%";
-  list.style.left = "0";
-  list.style.right = "0";
-  list.style.background = "white";
-  list.style.border = "1px solid #ccc";
-  list.style.zIndex = "9999";
-  list.style.maxHeight = "200px";
-  list.style.overflowY = "auto";
+          console.log("👤 Employee selected:", emp);
 
-  matches.forEach(emp => {
-    const item = document.createElement("div");
-    item.textContent = emp.displayname;
-    item.style.padding = "6px";
-    item.style.cursor = "pointer";
+          // Autopopulated fields (console logging included)
+          const mappedFields = {
+            fullName: emp.displayname,
+            email: emp.mail,
+            jobTitle: emp.jobtitle,
+            department: emp.department,
+            manager: emp.manager,
+            managerEmail: emp.managermail,
+            employeeId: emp.employeeId,
+            division: emp.division
+          };
 
-    item.onclick = () => {
-      selectedEmployee = emp;
-      document.getElementById("empSearch").value = emp.displayname;
-      dropdown.innerHTML = "";
-      autofill(emp);
-    };
+          console.log("📌 Autopopulated fields:", mappedFields);
+        };
 
-    item.onmouseover = () => item.style.background = "#eee";
-    item.onmouseout = () => item.style.background = "#fff";
+        resultList.appendChild(div);
+      });
 
-    list.appendChild(item);
-  });
+      resultList.style.display = filtered.length ? "block" : "none";
+    });
 
-  dropdown.appendChild(list);
-}
+    document.addEventListener("click", e => {
+      if (!e.target.closest(".wrapper")) {
+        resultList.style.display = "none";
+      }
+    });
+  }
 
-// Fill Jotform fields
-function autofill(emp) {
-  const fieldMap = [
-    { id: "5", value: emp.displayname || "" },    // FULL NAME
-    { id: "6", value: emp.mail || "" },           // Email
-    { id: "7", value: emp.jobtitle || "" },       // Job Title
-    { id: "8", value: emp.department || "" },     // Department
-    { id: "9", value: emp.manager || "" },        // Manager
-    { id: "10", value: emp.managermail || "" },   // Manager Email
-    { id: "11", value: emp.employeeId || "" },    // Employee ID
-    { id: "12", value: emp.division || "" }       // Division
-  ];
-
-  console.log("Autofill map:", fieldMap);
-  JFCustomWidget.setFieldsValueById(fieldMap);
-
-  // Pipe data for the widget's stored value
-  const pipe = [
-    emp.displayname, emp.mail, emp.jobtitle,
-    emp.department, emp.manager, emp.managermail,
-    emp.employeeId, emp.division
-  ].join("|");
-
-  JFCustomWidget.storeToField("widget_input", pipe);
-}
-
-// Widget engine
-function Widget() {
-  this.init = async function() {
-    await loadUsers();
-    buildUI();
-  };
-
-  this.getData = function() {
-    if (!selectedEmployee) return { valid: true, value: "" };
-    const e = selectedEmployee;
-
-    return {
-      valid: true,
-      value: [
-        e.displayname, e.mail, e.jobtitle,
-        e.department, e.manager, e.managermail,
-        e.employeeId, e.division
-      ].join("|")
-    };
-  };
-}
-
-// Jotform lifecycle
-JFCustomWidget.subscribe("ready", () => {
-  const widget = new Widget();
-  widget.init();
-
-  JFCustomWidget.subscribe("submit", () => {
-    JFCustomWidget.sendSubmit(widget.getData());
-  });
-});
+  initSearch();
 </script>
 
 </body>
