@@ -22,6 +22,7 @@
       let users = [];
       let selectedEmployee = null;
 
+      // Load employees
       async function loadUsers() {
         try {
           const res = await fetch(API_URL);
@@ -33,6 +34,7 @@
       }
       loadUsers();
 
+      // Build dropdown
       function createDropdown(matches) {
         const container = document.getElementById("dropdown");
         container.innerHTML = "";
@@ -49,28 +51,24 @@
         list.style.maxHeight = "180px";
         list.style.overflowY = "auto";
 
-        matches.forEach(u => {
+        matches.forEach(emp => {
           const item = document.createElement("div");
-          item.textContent = u.displayname || "(No Name)";
+          item.textContent = emp.displayname || "(No Name)";
           item.style.padding = "6px";
           item.style.cursor = "pointer";
 
           item.addEventListener("click", () => {
-            console.log("🟢 Selected employee:", u);
-            selectedEmployee = u;
+            console.log("🟢 Selected employee:", emp);
+            selectedEmployee = emp;
 
-            document.getElementById("employeeSearch").value = u.displayname;
+            document.getElementById("employeeSearch").value = emp.displayname;
             container.innerHTML = "";
 
-            autoFillEmployee(u);
+            autoFillEmployee(emp);
           });
 
-          item.addEventListener("mouseover", () => {
-            item.style.background = "#f0f0f0";
-          });
-          item.addEventListener("mouseout", () => {
-            item.style.background = "#fff";
-          });
+          item.addEventListener("mouseover", () => item.style.background = "#f0f0f0");
+          item.addEventListener("mouseout", () => item.style.background = "#fff");
 
           list.appendChild(item);
         });
@@ -78,8 +76,9 @@
         container.appendChild(list);
       }
 
+      // Autofill + store value
       function autoFillEmployee(emp) {
-        // Build pipe-delimited output for the widget's value
+        // Build pipe-delimited value
         const output = [
           emp.displayname || "",
           emp.email || "",
@@ -93,47 +92,50 @@
 
         console.log("📤 Widget Output Value:", output);
 
-        // Autofill other fields via Jotform-supported API
+        // Field autofill mapping — starts at input_5
         const fieldMap = [
-          { id: "6", value: emp.displayname || "" },       // Full Name
-          { id: "7", value: emp.email || "" },            // Email
-          { id: "8", value: emp.title || "" },            // Job Title
-          { id: "9", value: emp.department || "" },       // Department
-          { id: "10", value: emp.manager || "" },         // Manager
-          { id: "11", value: emp.manager_email || "" },   // Manager Email
-          { id: "12", value: emp.employee_id || "" },     // Employee ID
-          { id: "13", value: emp.division || "" }         // Division
+          { id: "5",  value: emp.displayname || "" },     // Full Name
+          { id: "6",  value: emp.email || "" },           // Email
+          { id: "7",  value: emp.title || "" },           // Job Title
+          { id: "8",  value: emp.department || "" },      // Department
+          { id: "9",  value: emp.manager || "" },         // Manager
+          { id: "10", value: emp.manager_email || "" },   // Manager Email
+          { id: "11", value: emp.employee_id || "" },     // Employee ID
+          { id: "12", value: emp.division || "" }         // Division
         ];
 
-        console.log("📥 Autofilling form fields:", fieldMap);
+        console.log("📥 Autofilling form fields using allowed API:", fieldMap);
 
+        // Allowed API call
         JFCustomWidget.setFieldsValueById(fieldMap);
 
-        // Store widget’s own value
+        // Store widget's value
         JFCustomWidget.storeToField("widget_input", output);
       }
 
-      function GCLIDExample() {
+      // Widget engine
+      function EmployeeWidget() {
         this.init = init;
         this.getData = getData;
 
         function init(formData) {
-          console.log("🟦 Widget Ready — Initialization Complete");
+          console.log("🟦 Widget Ready — Init Fired");
 
-          document
-            .getElementById("employeeSearch")
-            .addEventListener("input", (e) => {
-              const q = e.target.value.toLowerCase().trim();
-              if (!q) return (document.getElementById("dropdown").innerHTML = "");
+          document.getElementById("employeeSearch").addEventListener("input", (e) => {
+            const q = e.target.value.toLowerCase().trim();
+            if (!q) {
+              document.getElementById("dropdown").innerHTML = "";
+              return;
+            }
 
-              const matches = users
-                .filter(u => (u.displayname || "").toLowerCase().includes(q))
-                .slice(0, 8);
+            const matches = users
+              .filter(u => (u.displayname || "").toLowerCase().includes(q))
+              .slice(0, 8);
 
-              console.log("🔎 Search:", q, "| Matches:", matches.length);
+            console.log("🔎 Search:", q, "| Matches:", matches.length);
 
-              createDropdown(matches);
-            });
+            createDropdown(matches);
+          });
         }
 
         function getData() {
@@ -150,14 +152,15 @@
               ].join("|")
             : "";
 
-          console.log("📨 sendSubmit payload:", value);
+          console.log("📨 Final Submit Value:", value);
 
           return { valid: true, value: value };
         }
       }
 
+      // Jotform events
       JFCustomWidget.subscribe("ready", function (data) {
-        const widget = new GCLIDExample();
+        const widget = new EmployeeWidget();
         widget.init(data);
 
         JFCustomWidget.subscribe("submit", function () {
