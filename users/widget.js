@@ -1,29 +1,33 @@
 console.clear();
-console.log("👤 Users Widget Loaded");
+console.log("🚀 Employee Lookup Widget Bootstrapped");
 
-// ===== CONFIG =====
+// CONFIG
 const API_URL = "https://myefnonvpjbggqqurvhy.supabase.co/functions/v1/users";
 let users = [];
 
 const searchInput = document.getElementById("searchUser");
 const resultsContainer = document.getElementById("resultsContainer");
 
-// ===== SAFE SEND TO JOTFORM =====
+// SAFE SEND
 function sendWidgetData(data) {
   try {
-    if (window.JFCustomWidget) JFCustomWidget.sendData(data);
+    if (window.JFCustomWidget) {
+      console.log("📤 Sending data to Jotform:", data);
+      JFCustomWidget.sendData(data);
+    }
   } catch (err) {
-    console.warn("⚠ sendData failed:", err);
+    console.warn("⚠ sendData error:", err);
   }
 }
 
-// ===== LOAD USER DATA =====
+// LOAD USER DATA
 async function loadUsers() {
   try {
     const res = await fetch(API_URL);
-    if (!res.ok) throw new Error(`Fetch failed: ${res.status}`);
+    if (!res.ok) throw new Error("Fetch failed: " + res.status);
+
     users = await res.json();
-    console.log(`✅ Loaded ${users.length} users`);
+    console.log(`📦 Loaded ${users.length} users from Supabase`);
   } catch (err) {
     console.error("❌ Error fetching users:", err);
   }
@@ -31,20 +35,26 @@ async function loadUsers() {
 
 loadUsers();
 
-// ===== AUTOCOMPLETE =====
+// AUTOCOMPLETE
 let debounceTimer;
+
 searchInput.addEventListener("input", (e) => {
   clearTimeout(debounceTimer);
-  debounceTimer = setTimeout(() => handleSearch(e.target.value.trim().toLowerCase()), 150);
+  debounceTimer = setTimeout(() => {
+    handleSearch(e.target.value.trim().toLowerCase());
+  }, 150);
 });
 
 function handleSearch(query) {
-  resultsContainer.querySelectorAll(".dropdown").forEach(d => d.remove());
+  resultsContainer.querySelectorAll(".dropdown").forEach(el => el.remove());
   if (!query) return;
 
   const matches = users
     .filter(u => (u.displayname || "").toLowerCase().includes(query))
     .slice(0, 8);
+
+  console.log("🔎 Search query:", query, "| Matches found:", matches.length);
+
   if (!matches.length) return;
 
   const dropdown = document.createElement("div");
@@ -54,31 +64,51 @@ function handleSearch(query) {
     const item = document.createElement("div");
     item.className = "dropdown-item";
     item.textContent = u.displayname || "(No Name)";
+
     item.addEventListener("click", () => {
       searchInput.value = u.displayname || "";
       dropdown.remove();
-      console.log("✅ Selected user:", u);
+      console.log("🟢 User selected:", u);
 
-      // Send selected user to Jotform
+      // Autofill JotForm mapping
+      if (window.JFCustomWidget) {
+        const mapping = {
+          input_6:  u.displayname || "",
+          input_7:  u.email || "",
+          input_8:  u.title || "",
+          input_9:  u.department || "",
+          input_10: u.manager || "",
+          input_11: u.manager_email || "",
+          input_12: u.employee_id || "",
+          input_13: u.division || ""
+        };
+
+        console.log("📥 Autofilling Jotform fields:", mapping);
+
+        JFCustomWidget.setFieldsValue(mapping);
+      }
+
+      // Send raw record for storage
       sendWidgetData({ valid: true, value: JSON.stringify(u) });
     });
+
     dropdown.appendChild(item);
   });
 
   resultsContainer.appendChild(dropdown);
 }
 
-// ===== CLICK OUTSIDE TO CLOSE =====
+// CLICK OUTSIDE TO CLOSE
 document.addEventListener("click", (e) => {
-  if (!resultsContainer.contains(e.target) && e.target !== searchInput) {
-    resultsContainer.querySelectorAll(".dropdown").forEach(d => d.remove());
+  if (!resultsContainer.contains(e.target)) {
+    resultsContainer.querySelectorAll(".dropdown").forEach(el => el.remove());
   }
 });
 
-// ===== JOTFORM READY =====
+// JOTFORM READY EVENT
 if (window.JFCustomWidget) {
-  JFCustomWidget.subscribe("ready", function () {
-    console.log("✅ Users Widget Ready");
+  JFCustomWidget.subscribe("ready", () => {
+    console.log("🟩 Jotform Widget Ready");
     sendWidgetData({ valid: true, value: "" });
   });
 }
