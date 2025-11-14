@@ -5,15 +5,7 @@
 </head>
 
 <body>
-  <div id="widgetContainer">
-    <input 
-      id="employeeSearch"
-      placeholder="Search employee..."
-      autocomplete="off"
-      style="width:100%;padding:6px;border:1px solid #ccc;border-radius:4px;"
-    />
-    <div id="dropdown"></div>
-  </div>
+<div id="widget"></div>
 
 <script>
 const API_URL = "https://myefnonvpjbggqqurvhy.supabase.co/functions/v1/users";
@@ -21,16 +13,50 @@ const API_URL = "https://myefnonvpjbggqqurvhy.supabase.co/functions/v1/users";
 let users = [];
 let selectedEmployee = null;
 
+// Load Supabase records
 async function loadUsers() {
   const res = await fetch(API_URL);
   users = await res.json();
   console.log("📦 Loaded employees:", users.length);
 }
 
-function createDropdown(matches) {
+// Create widget UI dynamically after iframe loads
+function buildUI() {
+  const container = document.getElementById("widget");
+
+  const input = document.createElement("input");
+  input.id = "employeeSearch";
+  input.placeholder = "Search employee...";
+  input.style.width = "100%";
+  input.style.padding = "6px";
+  input.style.border = "1px solid #ccc";
+  input.style.borderRadius = "4px";
+
+  const dropdown = document.createElement("div");
+  dropdown.id = "dropdown";
+  dropdown.style.position = "relative";
+
+  container.appendChild(input);
+  container.appendChild(dropdown);
+
+  input.addEventListener("input", () => {
+    const q = input.value.toLowerCase().trim();
+    if (!q) return dropdown.innerHTML = "";
+
+    const matches = users.filter(u =>
+      (u.displayname || "").toLowerCase().includes(q)
+    ).slice(0, 8);
+
+    console.log("🔎 Matches:", matches.length);
+
+    buildDropdown(matches);
+  });
+}
+
+// Create dropdown
+function buildDropdown(matches) {
   const dropdown = document.getElementById("dropdown");
   dropdown.innerHTML = "";
-  dropdown.style.position = "relative";
 
   const list = document.createElement("div");
   list.style.position = "absolute";
@@ -45,16 +71,15 @@ function createDropdown(matches) {
 
   matches.forEach(emp => {
     const item = document.createElement("div");
+    item.textContent = emp.displayname;
     item.style.padding = "6px";
     item.style.cursor = "pointer";
-    item.textContent = emp.displayname;
 
     item.onclick = () => {
-      console.log("🟢 Selected employee:", emp);
       selectedEmployee = emp;
       document.getElementById("employeeSearch").value = emp.displayname;
       dropdown.innerHTML = "";
-      autoFill(emp);
+      autofill(emp);
     };
 
     item.onmouseover = () => item.style.background = "#f0f0f0";
@@ -66,8 +91,9 @@ function createDropdown(matches) {
   dropdown.appendChild(list);
 }
 
-function autoFill(emp) {
-  const pipeData = [
+// Autofill Jotform fields
+function autofill(emp) {
+  const pipeValue = [
     emp.displayname || "",
     emp.mail || "",
     emp.jobtitle || "",
@@ -78,67 +104,45 @@ function autoFill(emp) {
     emp.division || ""
   ].join("|");
 
-  console.log("📤 Pipe value:", pipeData);
+  console.log("📤 Final pipe value:", pipeValue);
 
-  const fieldMap = [
-    { id: "5",  value: emp.displayname || "" },
-    { id: "6",  value: emp.mail || "" },
-    { id: "7",  value: emp.jobtitle || "" },
-    { id: "8",  value: emp.department || "" },
-    { id: "9",  value: emp.manager || "" },
+  JFCustomWidget.setFieldsValueById([
+    { id: "5", value: emp.displayname || "" },
+    { id: "6", value: emp.mail || "" },
+    { id: "7", value: emp.jobtitle || "" },
+    { id: "8", value: emp.department || "" },
+    { id: "9", value: emp.manager || "" },
     { id: "10", value: emp.managermail || "" },
     { id: "11", value: emp.employeeId || "" },
     { id: "12", value: emp.division || "" }
-  ];
+  ]);
 
-  console.log("📥 Autofill map:", fieldMap);
-
-  JFCustomWidget.setFieldsValueById(fieldMap);
-  JFCustomWidget.storeToField("widget_input", pipeData);
+  JFCustomWidget.storeToField("widget_input", pipeValue);
 }
 
+// Widget engine
 function EmployeeWidget() {
   this.init = async function() {
     await loadUsers();
-
-    const input = document.getElementById("employeeSearch");
-
-    input.addEventListener("input", () => {
-      const q = input.value.toLowerCase().trim();
-      if (!q) {
-        document.getElementById("dropdown").innerHTML = "";
-        return;
-      }
-
-      const matches = users.filter(u =>
-        u.displayname.toLowerCase().includes(q)
-      ).slice(0, 8);
-
-      console.log("🔎 Matches:", matches.length);
-
-      createDropdown(matches);
-    });
+    buildUI();
   };
 
   this.getData = function() {
     if (!selectedEmployee) return { valid: true, value: "" };
+    const e = selectedEmployee;
 
-    const value = [
-      selectedEmployee.displayname,
-      selectedEmployee.mail,
-      selectedEmployee.jobtitle,
-      selectedEmployee.department,
-      selectedEmployee.manager,
-      selectedEmployee.managermail,
-      selectedEmployee.employeeId,
-      selectedEmployee.division
-    ].join("|");
-
-    return { valid: true, value };
+    return {
+      valid: true,
+      value: [
+        e.displayname, e.mail, e.jobtitle,
+        e.department, e.manager, e.managermail,
+        e.employeeId, e.division
+      ].join("|")
+    };
   };
 }
 
-// Jotform events
+// Jotform lifecycle
 JFCustomWidget.subscribe("ready", () => {
   const widget = new EmployeeWidget();
   widget.init();
