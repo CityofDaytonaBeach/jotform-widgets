@@ -1,172 +1,153 @@
 <!doctype html>
 <html>
-  <head>
-    <script src="//js.jotform.com/JotFormCustomWidget.min.js"></script>
-    <meta http-equiv="cache-control" content="no-cache" />
-    <meta http-equiv="expires" content="0" />
-    <meta http-equiv="pragma" content="no-cache" />
-  </head>
+<head>
+  <script src="//js.jotform.com/JotFormCustomWidget.min.js"></script>
+</head>
 
-  <body>
+<body>
+  <div id="widgetContainer">
     <input 
-      id="employeeSearch" 
-      placeholder="Search employee..." 
+      id="employeeSearch"
+      placeholder="Search employee..."
       autocomplete="off"
       style="width:100%;padding:6px;border:1px solid #ccc;border-radius:4px;"
     />
-
     <div id="dropdown"></div>
+  </div>
 
-    <script type="text/javascript">
-      const API_URL = "https://myefnonvpjbggqqurvhy.supabase.co/functions/v1/users";
-      let users = [];
-      let selectedEmployee = null;
+<script>
+const API_URL = "https://myefnonvpjbggqqurvhy.supabase.co/functions/v1/users";
 
-      // Load employees
-      async function loadUsers() {
-        try {
-          const res = await fetch(API_URL);
-          users = await res.json();
-          console.log("📦 Loaded employees:", users);
-        } catch (err) {
-          console.error("❌ Error loading users:", err);
-        }
-      }
-      loadUsers();
+let users = [];
+let selectedEmployee = null;
 
-      // Build dropdown list
-      function createDropdown(matches) {
-        const container = document.getElementById("dropdown");
-        container.innerHTML = "";
-        container.style.position = "relative";
+async function loadUsers() {
+  const res = await fetch(API_URL);
+  users = await res.json();
+  console.log("📦 Loaded employees:", users.length);
+}
 
-        const list = document.createElement("div");
-        list.style.position = "absolute";
-        list.style.top = "100%";
-        list.style.left = "0";
-        list.style.right = "0";
-        list.style.border = "1px solid #ccc";
-        list.style.background = "#fff";
-        list.style.zIndex = "9999";
-        list.style.maxHeight = "180px";
-        list.style.overflowY = "auto";
+function createDropdown(matches) {
+  const dropdown = document.getElementById("dropdown");
+  dropdown.innerHTML = "";
+  dropdown.style.position = "relative";
 
-        matches.forEach(emp => {
-          const item = document.createElement("div");
-          item.textContent = emp.displayname || "(No Name)";
-          item.style.padding = "6px";
-          item.style.cursor = "pointer";
+  const list = document.createElement("div");
+  list.style.position = "absolute";
+  list.style.top = "100%";
+  list.style.left = "0";
+  list.style.right = "0";
+  list.style.background = "#fff";
+  list.style.border = "1px solid #ccc";
+  list.style.zIndex = "9999";
+  list.style.maxHeight = "180px";
+  list.style.overflowY = "auto";
 
-          item.addEventListener("click", () => {
-            console.log("🟢 Selected employee:", emp);
-            selectedEmployee = emp;
+  matches.forEach(emp => {
+    const item = document.createElement("div");
+    item.style.padding = "6px";
+    item.style.cursor = "pointer";
+    item.textContent = emp.displayname;
 
-            document.getElementById("employeeSearch").value = emp.displayname;
-            container.innerHTML = "";
+    item.onclick = () => {
+      console.log("🟢 Selected employee:", emp);
+      selectedEmployee = emp;
+      document.getElementById("employeeSearch").value = emp.displayname;
+      dropdown.innerHTML = "";
+      autoFill(emp);
+    };
 
-            autoFillEmployee(emp);
-          });
+    item.onmouseover = () => item.style.background = "#f0f0f0";
+    item.onmouseout = () => item.style.background = "#fff";
 
-          item.addEventListener("mouseover", () => item.style.background = "#f0f0f0");
-          item.addEventListener("mouseout", () => item.style.background = "#fff");
+    list.appendChild(item);
+  });
 
-          list.appendChild(item);
-        });
+  dropdown.appendChild(list);
+}
 
-        container.appendChild(list);
-      }
+function autoFill(emp) {
+  const pipeData = [
+    emp.displayname || "",
+    emp.mail || "",
+    emp.jobtitle || "",
+    emp.department || "",
+    emp.manager || "",
+    emp.managermail || "",
+    emp.employeeId || "",
+    emp.division || ""
+  ].join("|");
 
-      // Autofill + store widget value
-      function autoFillEmployee(emp) {
-        // Build pipe-delimited value
-        const output = [
-          emp.displayname || "",
-          emp.mail || "",
-          emp.jobtitle || "",
-          emp.department || "",
-          emp.manager || "",
-          emp.managermail || "",
-          emp.employeeId || "",
-          emp.division || ""
-        ].join("|");
+  console.log("📤 Pipe value:", pipeData);
 
-        console.log("📤 Widget Output Value:", output);
+  const fieldMap = [
+    { id: "5",  value: emp.displayname || "" },
+    { id: "6",  value: emp.mail || "" },
+    { id: "7",  value: emp.jobtitle || "" },
+    { id: "8",  value: emp.department || "" },
+    { id: "9",  value: emp.manager || "" },
+    { id: "10", value: emp.managermail || "" },
+    { id: "11", value: emp.employeeId || "" },
+    { id: "12", value: emp.division || "" }
+  ];
 
-        // Field autofill mapping (input_5 -> input_12)
-        const fieldMap = [
-          { id: "5",  value: emp.displayname || "" },   // Full Name
-          { id: "6",  value: emp.mail || "" },         // Email
-          { id: "7",  value: emp.jobtitle || "" },     // Job Title
-          { id: "8",  value: emp.department || "" },   // Department
-          { id: "9",  value: emp.manager || "" },      // Manager
-          { id: "10", value: emp.managermail || "" },  // Manager Email
-          { id: "11", value: emp.employeeId || "" },   // Employee ID
-          { id: "12", value: emp.division || "" }      // Division
-        ];
+  console.log("📥 Autofill map:", fieldMap);
 
-        console.log("📥 Autofilling form fields:", fieldMap);
+  JFCustomWidget.setFieldsValueById(fieldMap);
+  JFCustomWidget.storeToField("widget_input", pipeData);
+}
 
-        // Allowed Jotform API
-        JFCustomWidget.setFieldsValueById(fieldMap);
+function EmployeeWidget() {
+  this.init = async function() {
+    await loadUsers();
 
-        // Store widget's value field
-        JFCustomWidget.storeToField("widget_input", output);
-      }
+    const input = document.getElementById("employeeSearch");
 
-      // Widget engine
-      function EmployeeWidget() {
-        this.init = init;
-        this.getData = getData;
-
-        function init(formData) {
-          console.log("🟦 Widget Ready — Init Fired");
-
-          document.getElementById("employeeSearch").addEventListener("input", (e) => {
-            const q = e.target.value.toLowerCase().trim();
-            if (!q) {
-              document.getElementById("dropdown").innerHTML = "";
-              return;
-            }
-
-            const matches = users
-              .filter(u => (u.displayname || "").toLowerCase().includes(q))
-              .slice(0, 8);
-
-            console.log("🔎 Search:", q, "| Matches:", matches.length);
-
-            createDropdown(matches);
-          });
-        }
-
-        function getData() {
-          const value = selectedEmployee
-            ? [
-                selectedEmployee.displayname,
-                selectedEmployee.mail,
-                selectedEmployee.jobtitle,
-                selectedEmployee.department,
-                selectedEmployee.manager,
-                selectedEmployee.managermail,
-                selectedEmployee.employeeId,
-                selectedEmployee.division
-              ].join("|")
-            : "";
-
-          console.log("📨 Final Submit Value:", value);
-
-          return { valid: true, value: value };
-        }
+    input.addEventListener("input", () => {
+      const q = input.value.toLowerCase().trim();
+      if (!q) {
+        document.getElementById("dropdown").innerHTML = "";
+        return;
       }
 
-      // Jotform readiness
-      JFCustomWidget.subscribe("ready", function (data) {
-        const widget = new EmployeeWidget();
-        widget.init(data);
+      const matches = users.filter(u =>
+        u.displayname.toLowerCase().includes(q)
+      ).slice(0, 8);
 
-        JFCustomWidget.subscribe("submit", function () {
-          JFCustomWidget.sendSubmit(widget.getData());
-        });
-      });
-    </script>
-  </body>
+      console.log("🔎 Matches:", matches.length);
+
+      createDropdown(matches);
+    });
+  };
+
+  this.getData = function() {
+    if (!selectedEmployee) return { valid: true, value: "" };
+
+    const value = [
+      selectedEmployee.displayname,
+      selectedEmployee.mail,
+      selectedEmployee.jobtitle,
+      selectedEmployee.department,
+      selectedEmployee.manager,
+      selectedEmployee.managermail,
+      selectedEmployee.employeeId,
+      selectedEmployee.division
+    ].join("|");
+
+    return { valid: true, value };
+  };
+}
+
+// Jotform events
+JFCustomWidget.subscribe("ready", () => {
+  const widget = new EmployeeWidget();
+  widget.init();
+
+  JFCustomWidget.subscribe("submit", () => {
+    JFCustomWidget.sendSubmit(widget.getData());
+  });
+});
+</script>
+
+</body>
 </html>
