@@ -34,7 +34,7 @@
       }
       loadUsers();
 
-      // Build dropdown
+      // Build dropdown list
       function createDropdown(matches) {
         const container = document.getElementById("dropdown");
         container.innerHTML = "";
@@ -76,40 +76,40 @@
         container.appendChild(list);
       }
 
-      // Autofill + store value
+      // Autofill + store widget value
       function autoFillEmployee(emp) {
         // Build pipe-delimited value
         const output = [
           emp.displayname || "",
-          emp.email || "",
-          emp.title || "",
+          emp.mail || "",
+          emp.jobtitle || "",
           emp.department || "",
           emp.manager || "",
-          emp.manager_email || "",
-          emp.employee_id || "",
+          emp.managermail || "",
+          emp.employeeId || "",
           emp.division || ""
         ].join("|");
 
         console.log("📤 Widget Output Value:", output);
 
-        // Field autofill mapping — starts at input_5
+        // Field autofill mapping (input_5 -> input_12)
         const fieldMap = [
-          { id: "5",  value: emp.displayname || "" },     // Full Name
-          { id: "6",  value: emp.email || "" },           // Email
-          { id: "7",  value: emp.title || "" },           // Job Title
-          { id: "8",  value: emp.department || "" },      // Department
-          { id: "9",  value: emp.manager || "" },         // Manager
-          { id: "10", value: emp.manager_email || "" },   // Manager Email
-          { id: "11", value: emp.employee_id || "" },     // Employee ID
-          { id: "12", value: emp.division || "" }         // Division
+          { id: "5",  value: emp.displayname || "" },   // Full Name
+          { id: "6",  value: emp.mail || "" },         // Email
+          { id: "7",  value: emp.jobtitle || "" },     // Job Title
+          { id: "8",  value: emp.department || "" },   // Department
+          { id: "9",  value: emp.manager || "" },      // Manager
+          { id: "10", value: emp.managermail || "" },  // Manager Email
+          { id: "11", value: emp.employeeId || "" },   // Employee ID
+          { id: "12", value: emp.division || "" }      // Division
         ];
 
-        console.log("📥 Autofilling form fields using allowed API:", fieldMap);
+        console.log("📥 Autofilling form fields:", fieldMap);
 
-        // Allowed API call
+        // Allowed Jotform API
         JFCustomWidget.setFieldsValueById(fieldMap);
 
-        // Store widget's value
+        // Store widget's value field
         JFCustomWidget.storeToField("widget_input", output);
       }
 
@@ -142,12 +142,12 @@
           const value = selectedEmployee
             ? [
                 selectedEmployee.displayname,
-                selectedEmployee.email,
-                selectedEmployee.title,
+                selectedEmployee.mail,
+                selectedEmployee.jobtitle,
                 selectedEmployee.department,
                 selectedEmployee.manager,
-                selectedEmployee.manager_email,
-                selectedEmployee.employee_id,
+                selectedEmployee.managermail,
+                selectedEmployee.employeeId,
                 selectedEmployee.division
               ].join("|")
             : "";
@@ -158,7 +158,7 @@
         }
       }
 
-      // Jotform events
+      // Jotform readiness
       JFCustomWidget.subscribe("ready", function (data) {
         const widget = new EmployeeWidget();
         widget.init(data);
