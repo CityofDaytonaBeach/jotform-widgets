@@ -1,0 +1,72 @@
+<!doctype html>
+<html>
+  <head>
+    <script src="//js.jotform.com/JotFormCustomWidget.min.js"></script>
+    <script src="https://demo.jotform.com/s/umd/f5e61623280/for-formuser.js"></script>
+    <meta http-equiv="cache-control" content="no-cache" />
+    <meta http-equiv="expires" content="0" />
+    <meta http-equiv="pragma" content="no-cache" />
+  </head>
+  <style></style>
+  <body>
+    <div id="reviewArea">
+    </div>
+    <script type="text/javascript">
+      function GCLIDExample() {
+        // get widget parameters if any using getWidgetSettings for all, or getWidgetSetting('name') for a specific one.
+        // const params = JFCustomWidget.getWidgetSettings();
+
+        // exposed functions
+        this.init = init;
+        this.getData = getData;
+
+        // initialization of the widget
+        function init(formData) {
+          console.log("Hello world!");
+        const otherFields = [
+          {id: '3', value: "i'm a texbox value"},
+          {id: '4', value: "4"},
+          {id: '5', value: "Type option 1"},
+          {id: '6', value: "Type option 2"},
+          {id: '7', value: "two"},
+          {id: '8', value: "4"},
+          {id: '12', value: "testing@jotform.com"},
+          {id: '13', value: "loreum ipsum ...."},
+          {id: '14', value: "01234 578 910"},
+          {id: '15', value: "333"},
+        ]
+          JFCustomWidget.setFieldsValueById(otherFields);
+          JFCustomWidget.storeToField("first_10", "first name");
+          JFCustomWidget.storeToField("last_10", "last name");
+          JFCustomWidget.storeToField("input_11_addr_line1", "Line one");
+          JFCustomWidget.storeToField("input_11_addr_line2", "Line two ");
+          JFCustomWidget.storeToField("input_11_city", "CITY")
+          JFCustomWidget.storeToField("input_11_state", "state")
+          JFCustomWidget.storeToField("input_11_postal", "post")
+          JFCustomWidget.storeToField("input_16_timeInput", "12:30")
+          JFCustomWidget.storeToField("input_16_ampm", "AM")
+        }
+        
+        // get widget data
+        function getData() {
+
+          return {
+            valid: true,
+            value: "TEST" //if you want the widget itself to have a value otherwise it's not needed
+          };
+        }
+      }
+
+      // always subscribe to ready event and implement widget related code
+      // inside callback function , it is the best practice while developing widgets
+      JFCustomWidget.subscribe("ready", function (data) {
+        var widget = new GCLIDExample();
+        widget.init(data);
+
+        JFCustomWidget.subscribe("submit", function () {
+          JFCustomWidget.sendSubmit(widget.getData());
+        });
+      });
+    </script>
+  </body>
+</html>
