@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Jotform API Dropdown Test Widget</title>
+
+<script src="https://js.jotform.com/JotFormCustomWidget.min.js"></script>
+
+<style>
+    body {
+        margin: 0;
+        padding: 10px;
+        font-family: Arial, sans-serif;
+    }
+    select {
+        width: 100%;
+        padding: 8px;
+        font-size: 16px;
+        border: 1px solid #bbb;
+        border-radius: 4px;
+    }
+</style>
+</head>
+
+<body>
+
+<h3>Jotform API Dropdown Test</h3>
+<select id="apiDropdown">
+    <option value="">Loading…</option>
+</select>
+
+<script>
+console.clear();
+console.log("🔧 Jotform API Test Widget Loaded");
+
+// ---------------------------------------------------------------
+// CONFIG
+// ---------------------------------------------------------------
+const FORM_ID = "253105736431047"; // your form
+const API_KEY = "ENTER_YOUR_API_KEY_HERE";
+
+// ---------------------------------------------------------------
+// FETCH JOTFORM QUESTIONS FROM API
+// ---------------------------------------------------------------
+async function loadQuestions() {
+    const url = `https://api.jotform.com/form/${FORM_ID}/questions?apiKey=${API_KEY}`;
+
+    console.log("🌐 Fetching:", url);
+
+    try {
+        const response = await fetch(url);
+        const data = await response.json();
+
+        console.log("📦 Jotform API Response:", data);
+
+        if (!data.content) {
+            console.warn("⚠ No content returned.");
+            return;
+        }
+
+        const dropdown = document.getElementById("apiDropdown");
+        dropdown.innerHTML = ""; // clear placeholder
+
+        Object.values(data.content).forEach(q => {
+            const opt = document.createElement("option");
+            opt.value = q.name;
+            opt.textContent = q.text || q.name;
+            dropdown.appendChild(opt);
+        });
+
+        console.log("✅ Dropdown populated with Jotform API questions.");
+
+    } catch (error) {
+        console.error("❌ Error loading Jotform API:", error);
+    }
+}
+
+loadQuestions();
+
+// ---------------------------------------------------------------
+// SEND SELECTED VALUE TO JOTFORM
+// ---------------------------------------------------------------
+document.getElementById("apiDropdown").addEventListener("change", function () {
+    const selected = this.value;
+    console.log("🎯 Selected from dropdown:", selected);
+
+    // HIPAA-safe value push
+    JFCustomWidget.sendData({
+        valid: true,
+        value: selected
+    });
+
+    console.log("📨 Value sent to Jotform:", selected);
+});
+
+// ---------------------------------------------------------------
+JFCustomWidget.subscribe("ready", function() {
+    console.log("🟢 Widget Ready (Handshake OK)");
+    JFCustomWidget.sendData({ valid: true, value: "" });
+});
+</script>
+
+</body>
+</html>
