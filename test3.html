@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Employee Lookup Widget</title>
+
+  <!-- Jotform Widget API -->
+  <script src="https://js.jotform.com/JotFormCustomWidget.min.js"></script>
+
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: Arial, sans-serif;
+    }
+
+    #resultsContainer {
+      position: relative;
+      width: 100%;
+      overflow: visible;
+    }
+
+    #searchUser {
+      width: 100%;
+      padding: 6px;
+      margin: 0;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      box-sizing: border-box;
+    }
+
+    .dropdown {
+      position: absolute;
+      top: 100%;
+      left: 0;
+      right: 0;
+      background: #fff;
+      border: 1px solid #ccc;
+      border-top: none;
+      z-index: 9999;
+      max-height: 180px;
+      overflow-y: auto;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    .dropdown-item {
+      cursor: pointer;
+      padding: 6px 8px;
+    }
+
+    .dropdown-item:hover {
+      background: #f0f0f0;
+    }
+  </style>
+</head>
+
+<body>
+
+<div id="resultsContainer">
+  <input type="text" id="searchUser" placeholder="Search employee..." autocomplete="off">
+</div>
+
+<script>
+/* ============================================================
+   STARTUP + DIAGNOSTICS
+============================================================ */
+
+console.clear();
+console.log("👤 Users Widget Loaded");
+
+window.addEventListener("error", (e) => {
+  console.log("🟥 JS ERROR:", e.message, e.error);
+});
+
+window.addEventListener("unhandledrejection", (e) => {
+  console.log("🟥 PROMISE REJECTION:", e.reason);
+});
+
+console.log(
+  "🔍 IFRAME CHECK:",
+  window.top === window.self
+    ? "❌ Not inside iframe"
+    : "✅ Inside iframe"
+);
+
+/* Wrap fetch for better logging */
+const originalFetch = window.fetch;
+window.fetch = async function (...args) {
+  console.log("🌐 FETCH START:", args[0]);
+
+  try {
+    const res = await originalFetch(...args);
+    console.log("🌐 FETCH RESPONSE:", args[0], res.status);
+    return res;
+  } catch (err) {
+    console.log("🟥 FETCH ERROR:", err);
+    throw err;
+  }
+};
+
+/* ============================================================
+   CONFIG
+============================================================ */
+const API_URL =
+  "https://myefnonvpjbggqqurvhy.supabase.co/functions/v1/users";
+
+let users = [];
+const searchInput = document.getElementById("searchUser");
+const resultsContainer = document.getElementById("resultsContainer");
+
+/* ============================================================
+   LOAD USERS
+============================================================ */
+async function loadUsers() {
+  console.log("🌐 Fetching users…");
+
+  try {
+    const res = await fetch(API_URL);
+    console.log("🌐 Response status:", res.status);
+
+    if (!res.ok) throw new Error(`Fetch failed: ${res.status}`);
+
+    users = await res.json();
+
+    console.log(`✅ Loaded ${users.length} users`);
+    console.log("📦 Users Data:", users);
+  } catch (err) {
+    console.error("❌ Error fetching users:", err);
+  }
+}
+
+loadUsers();
+
+/* ============================================================
+   AUTOCOMPLETE DROPDOWN
+============================================================ */
+let debounceTimer;
+
+searchInput.addEventListener("input", (e) => {
+  clearTimeout(debounceTimer);
+  debounceTimer = setTimeout(() => {
+    handleSearch(e.target.value.toLowerCase().trim());
+  }, 150);
+});
+
+function handleSearch(query) {
+  resultsContainer.querySelectorAll(".dropdown").forEach((d) => d.remove());
+
+  if (!query) return;
+
+  const matches = users
+    .filter((u) =>
+      (u.displayname || "").toLowerCase().includes(query)
+    )
+    .slice(0, 10);
+
+  console.log("🔍 Matches:", matches);
+
+  if (!matches.length) return;
+
+  const dropdown = document.createElement("div");
+  dropdown.className = "dropdown";
+
+  matches.forEach((u) => {
+    const item = document.createElement("div");
+    item.className = "dropdown-item";
+    item.textContent = u.displayname || "(No Name)";
+
+    item.addEventListener("click", () => {
+      searchInput.value = u.displayname || "";
+      dropdown.remove();
+
+      console.log("✅ Selected user:", u);
+
+      const payload = {
+        valid: true,
+        value: JSON.stringify(u),
+        fields: {
+          input_6: u.displayname,
+          input_7: u.email,
+          input_8: u.title,
+          input_9: u.department,
+          input_10: u.manager,
+          input_11: u.manager_email,
+          input_12: u.employee_id,
+          input_13: u.division
+        }
+      };
+
+      console.log("📤 Sending to Jotform:", payload);
+
+      if (window.JFCustomWidget) {
+        JFCustomWidget.sendData(payload);
+      }
+    });
+
+    dropdown.appendChild(item);
+  });
+
+  resultsContainer.appendChild(dropdown);
+}
+
+/* Close dropdown when clicking outside */
+document.addEventListener("click", (e) => {
+  if (!resultsContainer.contains(e.target)) {
+    resultsContainer.querySelectorAll(".dropdown").forEach((d) => d.remove());
+  }
+});
+
+/* ============================================================
+   JOTFORM WIDGET READY
+============================================================ */
+if (window.JFCustomWidget) {
+  JFCustomWidget.subscribe("ready", () => {
+    console.log("✅ Jotform Widget Ready");
+
+    JFCustomWidget.sendData({
+      valid: true,
+      value: ""
+    });
+  });
+}
+</script>
+
+</body>
+</html>
