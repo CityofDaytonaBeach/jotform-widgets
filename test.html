@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <script src="//js.jotform.com/JotFormCustomWidget.min.js"></script>
+
+  <style>
+    #searchBox {
+      width: 100%;
+      padding: 10px;
+      margin-bottom: 5px;
+      font-size: 15px;
+      box-sizing: border-box;
+    }
+
+    #resultList {
+      width: 100%;
+      max-height: 200px;
+      border: 1px solid #ccc;
+      border-top: none;
+      background: white;
+      overflow-y: auto;
+      display: none;
+      position: absolute;
+      z-index: 9999;
+    }
+
+    .result-item {
+      padding: 10px;
+      cursor: pointer;
+      border-bottom: 1px solid #eee;
+    }
+
+    .result-item:hover {
+      background: #f4f4f4;
+    }
+
+    .wrapper {
+      position: relative;
+      width: 100%;
+    }
+  </style>
+</head>
+
+<body>
+
+<div class="wrapper">
+  <input type="text" id="searchBox" placeholder="Search employees by full name…">
+  <div id="resultList"></div>
+</div>
+
+<script>
+/*-------------------------------------------------------------------------
+   CORE WIDGET OBJECT
+-------------------------------------------------------------------------*/
+function EmployeeWidget() {
+
+  this.init = init;
+  this.getData = getData;
+
+  let employees = [];
+  let selectedEmployee = null;
+
+  /*-------------------------------------------------------
+     INITIALIZATION LIFECYCLE (Jotform-ready)
+  -------------------------------------------------------*/
+  async function init(formData) {
+    console.log("🔧 EmployeeWidget.init() — operationalizing widget instance.");
+
+    employees = await loadEmployees();
+    console.log("📊 Employees loaded:", employees.length);
+
+    activateSearch();
+  }
+
+  /*-------------------------------------------------------
+     SUPABASE DATA INGESTION
+  -------------------------------------------------------*/
+  async function loadEmployees() {
+    try {
+      const res = await fetch("https://myefnonvpjbggqqurvhy.supabase.co/functions/v1/users");
+      const data = await res.json();
+      return data;
+    } catch (err) {
+      console.error("❌ Employee fetch failed:", err);
+      return [];
+    }
+  }
+
+  /*-------------------------------------------------------
+     AUTOCOMPLETE SEARCH EXPERIENCE
+  -------------------------------------------------------*/
+  function activateSearch() {
+    const searchBox = document.getElementById("searchBox");
+    const resultList = document.getElementById("resultList");
+
+    searchBox.addEventListener("input", () => {
+      const query = searchBox.value.toLowerCase().trim();
+      resultList.innerHTML = "";
+
+      if (!query) return (resultList.style.display = "none");
+
+      const filtered = employees.filter(emp =>
+        emp.displayname.toLowerCase().includes(query)
+      );
+
+      filtered.forEach(emp => {
+        const div = document.createElement("div");
+        div.classList.add("result-item");
+        div.textContent = emp.displayname;
+
+        div.onclick = () => {
+          selectedEmployee = emp;
+          searchBox.value = emp.displayname;
+          resultList.style.display = "none";
+
+          autopopulate(emp);
+        };
+
+        resultList.appendChild(div);
+      });
+
+      resultList.style.display = filtered.length ? "block" : "none";
+    });
+
+    document.addEventListener("click", e => {
+      if (!e.target.closest(".wrapper")) resultList.style.display = "none";
+    });
+  }
+
+  /*-------------------------------------------------------
+     SEND SELECTED EMPLOYEE TO JOTFORM FIELDS
+  -------------------------------------------------------*/
+  function autopopulate(emp) {
+    console.log("🚀 Autopopulating Jotform fields with:", emp);
+
+    const fieldMap = [
+      { id: "input_5", value: emp.displayname },
+      { id: "input_6", value: emp.mail },
+      { id: "input_7", value: emp.jobtitle },
+      { id: "input_8", value: emp.department },
+      { id: "input_9", value: emp.manager },
+      { id: "input_10", value: emp.managermail },
+      { id: "input_11", value: emp.employeeId },
+      { id: "input_12", value: emp.division }
+    ];
+
+    try {
+      JFCustomWidget.setFieldsValueById(fieldMap);
+      console.log("✅ Field mapping executed.");
+    } catch (err) {
+      console.error("❌ Jotform autopopulation failed:", err);
+    }
+  }
+
+  /*-------------------------------------------------------
+     WIDGET VALUE DURING FORM SUBMISSION
+  -------------------------------------------------------*/
+  function getData() {
+    return {
+      valid: true,
+      value: selectedEmployee ? selectedEmployee.displayname : ""
+    };
+  }
+}
+
+/*-----------------------------------------------------------------------
+   JOTFORM WIDGET BINDING
+-----------------------------------------------------------------------*/
+JFCustomWidget.subscribe("ready", function (data) {
+  const widget = new EmployeeWidget();
+  widget.init(data);
+
+  JFCustomWidget.subscribe("submit", function () {
+    JFCustomWidget.sendSubmit(widget.getData());
+  });
+});
+</script>
+
+</body>
+</html>
