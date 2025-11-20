@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Employee Autofill Widget – Diagnostic Mode</title>
+
+<script src="https://js.jotform.com/JotFormCustomWidget.min.js"></script>
+</head>
+
+<body style="margin:0; padding:10px; font-family:Inter, Arial, sans-serif; color:#2C3345; background:transparent;">
+
+<div id="resultsContainer" style="position:relative; width:100%;">
+  <input 
+    id="searchUser" 
+    type="text" 
+    placeholder="Search employee..." 
+    autocomplete="off"
+    style="
+      width:100%;
+      padding:8px 10px;
+      border:1px solid #D0D0D0;
+      border-radius:4px;
+      font-size:14px;
+      box-sizing:border-box;
+      transition:border-color 0.2s ease;
+    "
+  >
+</div>
+
+<script>
+console.clear();
+console.log("🔧 Diagnostic Widget Loaded (Autofill Mode)");
+
+const SUPABASE_URL = "https://myefnonvpjbggqqurvhy.supabase.co/functions/v1/users";
+
+let users = [];
+let selectedUser = null;
+
+const fieldMap = {
+  fullName: 5,
+  email: 6,
+  jobTitle: 7,
+  department: 8,
+  manager: 9,
+  managerEmail: 10,
+  employeeId: 11,
+  division: 12
+};
+
+async function loadEmployees() {
+  try {
+    const r = await fetch(SUPABASE_URL);
+    users = await r.json();
+    console.log("📦 Employees loaded:", users.length);
+  } catch (e) {
+    console.error("❌ Error fetching Supabase data:", e);
+  }
+}
+loadEmployees();
+
+const searchBox = document.getElementById("searchUser");
+const container = document.getElementById("resultsContainer");
+
+let debounce = null;
+
+searchBox.addEventListener("input", e => {
+  clearTimeout(debounce);
+  debounce = setTimeout(() => handleSearch(e.target.value.trim().toLowerCase()), 150);
+});
+
+function handleSearch(query) {
+  container.querySelectorAll(".dropdown").forEach(d => d.remove());
+  if (!query) return;
+
+  const matches = users
+    .filter(u => (u.displayname || "").toLowerCase().includes(query))
+    .slice(0, 8);
+
+  if (!matches.length) return;
+
+  const dd = document.createElement("div");
+  dd.className = "dropdown";
+  dd.setAttribute("style", `
+    position:absolute;
+    top:100%;
+    left:0;
+    right:0;
+    background:#FFF;
+    border:1px solid #D0D0D0;
+    border-top:none;
+    border-radius:0 0 4px 4px;
+    z-index:9999;
+    max-height:200px;
+    overflow-y:auto;
+    box-shadow:0 2px 6px rgba(0,0,0,0.08);
+  `);
+
+  matches.forEach(u => {
+    const item = document.createElement("div");
+    item.className = "dropdown-item";
+    item.textContent = u.displayname;
+
+    item.setAttribute("style", `
+      padding:8px 10px;
+      cursor:pointer;
+      font-size:14px;
+      color:#2C3345;
+      transition:background 0.15s ease;
+    `);
+
+    item.onmouseover = () => item.style.background = "#F1F3F9";
+    item.onmouseout = () => item.style.background = "transparent";
+
+    item.onclick = () => {
+      selectedUser = u;
+      searchBox.value = u.displayname;
+      dd.remove();
+      autofill(u);
+    };
+
+    dd.appendChild(item);
+  });
+
+  container.appendChild(dd);
+}
+
+function autofill(u) {
+  const data = [
+    { id: fieldMap.fullName,     value: u.displayname },
+    { id: fieldMap.email,        value: u.mail },
+    { id: fieldMap.jobTitle,     value: u.jobtitle },
+    { id: fieldMap.department,   value: u.department },
+    { id: fieldMap.manager,      value: u.manager },
+    { id: fieldMap.managerEmail, value: u.managermail },
+    { id: fieldMap.employeeId,   value: u.employeeId },
+    { id: fieldMap.division,     value: u.division }
+  ];
+
+  try {
+    JFCustomWidget.setFieldsValueById(data);
+  } catch (err) {
+    console.error("❌ setFieldsValueById error:", err);
+  }
+
+  JFCustomWidget.sendData({
+    valid: true,
+    value: u.displayname
+  });
+}
+
+JFCustomWidget.subscribe("ready", () => {
+  console.log("🟢 Widget READY");
+  console.log("🛑 Field access allowed:", JFCustomWidget.fieldAccessAllowed);
+  JFCustomWidget.sendData({ valid: true, value: "" });
+});
+
+JFCustomWidget.subscribe("submit", () => {
+  console.log("📩 Jotform submit event");
+  JFCustomWidget.sendSubmit({
+    valid: true,
+    value: selectedUser ? selectedUser.displayname : ""
+  });
+});
+</script>
+
+</body>
+</html>
