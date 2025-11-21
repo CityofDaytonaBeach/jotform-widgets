@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Employee Autofill Widget</title>
+
+<!-- Jotform Widget Runtime -->
+<script src="https://js.jotform.com/JotFormCustomWidget.min.js"></script>
+
+<style>
+    /* Inherit Jotform's theme completely */
+    body {
+        margin: 0;
+        padding: 0;
+        background: transparent;
+    }
+
+    #resultsContainer {
+        position: relative;
+        width: 100%;
+    }
+
+    /* Use Jotform's built-in styling */
+    #searchUser {
+        width: 100%;
+        box-sizing: border-box;
+    }
+
+    /* Minimal dropdown styling so it displays properly, 
+       but still inherits all Jotform colors + fonts */
+    .dropdown {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        background: var(--form-background-color, #fff);
+        border: 1px solid var(--form-border-color, #ccc);
+        border-radius: 4px;
+        max-height: 220px;
+        overflow-y: auto;
+        z-index: 99999;
+    }
+
+    .dropdown-item {
+        padding: 8px;
+        cursor: pointer;
+        font-size: inherit;
+        color: inherit;
+    }
+
+    .dropdown-item:hover {
+        background: var(--form-hover-color, #f3f3f3);
+    }
+</style>
+</head>
+
+<body>
+
+<div id="resultsContainer" class="form-input-wide">
+    <input 
+        id="searchUser"
+        type="text"
+        placeholder="Search employee..."
+        autocomplete="off"
+        class="form-textbox form-autocomplete"
+    >
+</div>
+
+<script>
+
+/* ===========================================================
+   CONFIG
+=========================================================== */
+
+const SUPABASE_URL =
+  "https://myefnonvpjbggqqurvhy.supabase.co/functions/v1/users";
+
+let users = [];
+let selectedUser = null;
+let jotformIsReady = false;
+
+/* FIELD IDS: 4 → 11 */
+const fieldMap = {
+    fullName: "4",
+    email: "5",
+    jobTitle: "6",
+    department: "7",
+    manager: "8",
+    managerEmail: "9",
+    employeeId: "10",
+    division: "11"
+};
+
+/* ===========================================================
+   DATA LOADING
+=========================================================== */
+
+async function loadEmployees() {
+    try {
+        const res = await fetch(SUPABASE_URL);
+        users = await res.json();
+    } catch (err) {
+        console.error("Error loading Supabase employees:", err);
+    }
+}
+
+/* ===========================================================
+   AUTOCOMPLETE SEARCH UI
+=========================================================== */
+
+const searchBox = document.getElementById("searchUser");
+const container = document.getElementById("resultsContainer");
+let debounceTimer = null;
+
+searchBox.addEventListener("input", e => {
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(() => {
+        handleSearch(e.target.value.trim().toLowerCase());
+    }, 150);
+});
+
+document.addEventListener("click", e => {
+    if (!container.contains(e.target)) removeDropdowns();
+});
+
+function removeDropdowns() {
+    container.querySelectorAll(".dropdown").forEach(el => el.remove());
+}
+
+function handleSearch(rawQuery) {
+    removeDropdowns();
+    if (!rawQuery) return;
+
+    const safeQuery = rawQuery.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+    const matches = users
+        .filter(u =>
+            (u.displayname || "").toLowerCase().includes(safeQuery)
+        )
+        .slice(0, 10);
+
+    if (!matches.length) return;
+
+    const dd = document.createElement("div");
+    dd.className = "dropdown";
+
+    matches.forEach(u => {
+        const item = document.createElement("div");
+        item.className = "dropdown-item";
+        item.textContent = u.displayname;
+
+        item.onclick = () => {
+            clearTimeout(debounceTimer);
+            selectedUser = u;
+            searchBox.value = u.displayname;
+            removeDropdowns();
+            autofillFields(u);
+        };
+
+        dd.appendChild(item);
+    });
+
+    container.appendChild(dd);
+    autoResizeFrame();
+}
+
+/* ===========================================================
+   AUTOFILL FIELDS IN JOTFORM
+=========================================================== */
+
+function autofillFields(u) {
+
+    if (!jotformIsReady) return;
+
+    const payload = {
+        [fieldMap.fullName]: u.displayname || "",
+        [fieldMap.email]: u.mail || "",
+        [fieldMap.jobTitle]: u.jobtitle || "",
+        [fieldMap.department]: u.department || "",
+        [fieldMap.manager]: u.manager || "",
+        [fieldMap.managerEmail]: u.managermail || "",
+        [fieldMap.employeeId]: u.employeeId || "",
+        [fieldMap.division]: u.division || ""
+    };
+
+    try {
+        JFCustomWidget.setFieldsValueById(payload);
+    } catch (err) {
+        console.error("setFieldsValueById error:", err);
+    }
+
+    // Update widget's own value
+    JFCustomWidget.sendData({
+        valid: true,
+        value: u.displayname || ""
+    });
+
+    autoResizeFrame();
+}
+
+function autoResizeFrame() {
+    setTimeout(() => {
+        JFCustomWidget.requestFrameResize({
+            height: document.documentElement.scrollHeight + 20
+        });
+    }, 50);
+}
+
+/* ===========================================================
+   JOTFORM EVENTS
+=========================================================== */
+
+JFCustomWidget.subscribe("ready", async () => {
+    jotformIsReady = true;
+
+    await loadEmployees();
+
+    // Initial handshake
+    JFCustomWidget.sendData({ valid: true, value: "" });
+
+    autoResizeFrame();
+});
+
+JFCustomWidget.subscribe("submit", () => {
+    JFCustomWidget.sendSubmit({
+        valid: true,
+        value: selectedUser ? selectedUser.displayname : ""
+    });
+});
+
+</script>
+</body>
+</html>
