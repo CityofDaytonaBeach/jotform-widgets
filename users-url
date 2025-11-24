@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+
+    <style>
+        body {
+            font-family: 'Circular', -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background: transparent;
+        }
+
+        #widgetContainer {
+            padding: 0 16px;
+            width: 100%;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        input.form-textbox {
+            width: 100%;
+            padding: 12px 14px;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            font-size: 16px;
+            background: #fff;
+            transition: all 0.2s ease;
+            box-sizing: border-box;
+            font-family: inherit;
+        }
+
+        input.form-textbox:focus {
+            outline: none;
+            border-color: #0099ff;
+            box-shadow: 0 0 0 3px rgba(0, 153, 255, 0.1);
+        }
+
+        .dropdown {
+            position: absolute;
+            top: calc(100% + 4px);
+            left: 0;
+            width: 100%;
+            background: #fff;
+            border: 1px solid #d1d5db;
+            z-index: 99999;
+            max-height: 240px;
+            overflow-y: auto;
+            border-radius: 6px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            margin-top: 2px;
+        }
+
+        .dropdown-item {
+            padding: 12px 14px;
+            cursor: pointer;
+            font-size: 15px;
+            transition: background-color 0.15s ease;
+            border-bottom: 1px solid #f3f4f6;
+        }
+
+        .dropdown-item:last-child {
+            border-bottom: none;
+        }
+
+        .dropdown-item:hover {
+            background: #f9fafb;
+        }
+
+        .dropdown-item:active {
+            background: #f3f4f6;
+        }
+
+        #nextBtn {
+            margin-top: 32px;
+            width: 100%;
+            padding: 14px;
+            background: #0099ff;
+            border: none;
+            border-radius: 6px;
+            color: white;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+            font-family: inherit;
+        }
+
+        #nextBtn:hover:not(:disabled) {
+            background: #0088e6;
+        }
+
+        #nextBtn:active:not(:disabled) {
+            background: #0077cc;
+        }
+
+        #nextBtn:disabled {
+            background: #cbd5e1;
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
+
+        html, body { overflow-x: hidden; }
+
+        /* Custom scrollbar for dropdown */
+        .dropdown::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .dropdown::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 0 6px 6px 0;
+        }
+
+        .dropdown::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+
+        .dropdown::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+    </style>
+</head>
+
+<body>
+
+<div id="widgetContainer">
+    <div id="resultsContainer" style="position: relative;">
+        <input id="searchUser"
+               class="form-textbox"
+               type="text"
+               placeholder="Search employee..."
+               autocomplete="off">
+    </div>
+    <button id="nextBtn" disabled>Next</button>
+</div>
+
+<script>
+/* ---------------------------------------------------
+   CONFIG
+--------------------------------------------------- */
+const API_URL = "https://myefnonvpjbggqqurvhy.supabase.co/functions/v1/users-api";
+const FORM_URL = "https://daytonabeach.jotform.com/253244335284052";
+
+let selectedUser = null;
+let debounceTimer;
+
+const input = document.getElementById("searchUser");
+const container = document.getElementById("resultsContainer");
+const nextBtn = document.getElementById("nextBtn");
+
+/* ---------------------------------------------------
+   INPUT LISTENER
+--------------------------------------------------- */
+input.addEventListener("input", () => {
+    const query = input.value.trim();
+
+    selectedUser = null;
+    nextBtn.disabled = true;
+    cleanupDropdown();
+
+    clearTimeout(debounceTimer);
+
+    debounceTimer = setTimeout(() => {
+        if (query.length < 1) return;
+        searchEmployees(query);
+    }, 250);
+});
+
+/* ---------------------------------------------------
+   FETCH + DEBUGGING
+--------------------------------------------------- */
+async function searchEmployees(query) {
+    try {
+        const url = `${API_URL}?search=${encodeURIComponent(query)}`;
+        console.log("[API REQUEST]", url);
+
+        const res = await fetch(url);
+        console.log("[API STATUS]", res.status);
+
+        const payload = await res.json();
+        console.log("[API PAYLOAD]", payload);
+
+        if (!Array.isArray(payload)) {
+            console.error("🚨 BACKEND ERROR OBJECT:", payload);
+            return;
+        }
+
+        // Backend already filtered - just use the results directly
+        console.log("[RESULTS FROM BACKEND]", payload);
+
+        if (payload.length) {
+            renderDropdown(payload);
+        } else {
+            console.log("[NO MATCHING RESULTS]");
+        }
+
+    } catch (err) {
+        console.error("🚨 FETCH FAILURE:", err);
+    }
+}
+
+/* ---------------------------------------------------
+   DROPDOWN RENDER
+--------------------------------------------------- */
+function renderDropdown(results) {
+    cleanupDropdown();
+
+    const dd = document.createElement("div");
+    dd.className = "dropdown";
+
+    results.forEach(u => {
+        const officialName = u.override_displayname || u.displayname;
+
+        const item = document.createElement("div");
+        item.className = "dropdown-item";
+        item.textContent = officialName;
+
+        item.onclick = () => {
+            selectedUser = u;
+            input.value = officialName;
+            nextBtn.disabled = false;
+            cleanupDropdown();
+        };
+
+        dd.appendChild(item);
+    });
+
+    container.appendChild(dd);
+}
+
+function cleanupDropdown() {
+    const dd = container.querySelector(".dropdown");
+    if (dd) dd.remove();
+}
+
+/* ---------------------------------------------------
+   NEXT BUTTON → JOTFORM
+--------------------------------------------------- */
+nextBtn.onclick = () => {
+    if (!selectedUser) return;
+
+    // Handle both employeeid and employeeId (case variations)
+    const empId = selectedUser.employeeid || selectedUser.employeeId || selectedUser.employeeID || '';
+
+    const params = new URLSearchParams({
+        fullName: selectedUser.override_displayname || selectedUser.displayname || '',
+        email: selectedUser.mail || '',
+        jobTitle: selectedUser.jobtitle || '',
+        department: selectedUser.department || '',
+        manager: selectedUser.manager || '',
+        mangerEmail: selectedUser.managermail || '', // Note: JotForm uses "mangerEmail" (typo in JotForm)
+        employeeId: empId,
+        division: selectedUser.division || '',
+        jumpToPage: 2
+    });
+
+    console.log("✅ Selected User Object:", selectedUser);
+    console.log("✅ Employee ID value:", empId);
+    console.log("✅ Params being sent to JotForm:", params.toString());
+
+    window.open(`${FORM_URL}?${params.toString()}`, "_blank");
+};
+</script>
+
+</body>
+</html>
