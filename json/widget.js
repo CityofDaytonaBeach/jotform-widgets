@@ -26,7 +26,7 @@ function debounce(fn, delay = 150) {
 }
 
 // ----------------------------------
-// Build mappings DIRECTLY from settings
+// Build mappings STRICTLY from settings
 // ----------------------------------
 function buildMappings(settings) {
   const mappings = [];
@@ -73,10 +73,8 @@ JFCustomWidget.subscribe("ready", async () => {
     return;
   }
 
-  // --- FIELD MAPPINGS (SOURCE OF TRUTH) ---
   const FIELD_MAPPINGS = buildMappings(settings);
-
-  console.log("Resolved field mappings:", FIELD_MAPPINGS);
+  console.log("Resolved mappings:", FIELD_MAPPINGS);
 
   // --- DOM ---
   const input = document.getElementById("searchBox");
@@ -109,7 +107,7 @@ JFCustomWidget.subscribe("ready", async () => {
   }
 
   // ----------------------------------
-  // Load JSON
+  // Load JSON Data
   // ----------------------------------
   async function loadData() {
     try {
@@ -176,14 +174,14 @@ JFCustomWidget.subscribe("ready", async () => {
   }
 
   // ----------------------------------
-  // Selection + STRICT MAPPING EXECUTION
+  // Selection + ID-based population
   // ----------------------------------
   function selectEntry(entry) {
     const flat = entry.flat;
     const identifier = flat[idKey];
 
     if (identifier == null) {
-      setStatus(`ID key not found: ${idKey}`, "error");
+      setStatus(`Missing ID key: ${idKey}`, "error");
       return;
     }
 
@@ -193,9 +191,9 @@ JFCustomWidget.subscribe("ready", async () => {
       const value = flat[map.jsonKey];
 
       console.log(
-        `Mapping check → JSON key "${map.jsonKey}"`,
+        `Mapping → ${map.jsonKey}:`,
         value,
-        `→ Field "${map.fieldId}"`
+        `→ ${map.fieldId}`
       );
 
       if (value !== undefined && value !== null) {
@@ -206,10 +204,13 @@ JFCustomWidget.subscribe("ready", async () => {
       }
     });
 
-    console.log("Final population payload:", payload);
+    console.log("Final ID population payload:", payload);
 
+    // 🔑 CRITICAL FIX: defer write to next macrotask
     if (payload.length) {
-      JFCustomWidget.setFieldsValueById(payload);
+      setTimeout(() => {
+        JFCustomWidget.setFieldsValueById(payload);
+      }, 0);
     }
 
     let returnValue;
