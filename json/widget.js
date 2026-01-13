@@ -1,6 +1,6 @@
-// ----------------------------------
+// ==================================
 // Utilities
-// ----------------------------------
+// ==================================
 function flatten(obj, prefix = "", out = {}) {
   for (const key in obj) {
     if (!Object.prototype.hasOwnProperty.call(obj, key)) continue;
@@ -24,13 +24,14 @@ function debounce(fn, delay = 150) {
   };
 }
 
-// ----------------------------------
-// Build mappings (QUESTION ID source of truth)
-// ----------------------------------
+// ==================================
+// Build mappings from widget settings
+// EXPECTS QUESTION IDs (e.g. "4")
+// ==================================
 function buildMappings(settings) {
   const mappings = [];
 
-  for (let i = 1; i <= 15; i++) {
+  for (let i = 1; i <= 10; i++) {
     const jsonKey = settings[`map${i}_jsonKey`];
     const qid = settings[`map${i}_fieldId`];
 
@@ -53,27 +54,23 @@ function buildMappings(settings) {
   return mappings;
 }
 
-// ----------------------------------
+// ==================================
 // Widget Initialization
-// ----------------------------------
+// ==================================
 JFCustomWidget.subscribe("ready", function () {
-  console.group("🧩 Widget Ready");
+  console.group("Widget Init");
 
   const settings = JFCustomWidget.getWidgetSettings() || {};
-  console.log("Widget settings received:", settings);
+  console.log("Settings received:", settings);
 
   const jsonURL = settings.jsonURL;
   const searchKey = (settings.searchKey || "").trim();
   const idKey = (settings.idKey || searchKey).trim();
-  const returnFormat = (settings.returnFormat || "value").toLowerCase();
   const minChars = Number(settings.minChars || 2);
+  const returnFormat = (settings.returnFormat || "value").toLowerCase();
 
   if (!jsonURL || !searchKey || !idKey) {
-    console.error("❌ REQUIRED SETTINGS MISSING", {
-      jsonURL,
-      searchKey,
-      idKey
-    });
+    console.error("Missing required widget settings");
     console.groupEnd();
     return;
   }
@@ -82,7 +79,9 @@ JFCustomWidget.subscribe("ready", function () {
   console.log("Resolved mappings:", FIELD_MAPPINGS);
 
   if (!FIELD_MAPPINGS.length) {
-    console.warn("⚠️ No valid field mappings detected");
+    console.warn(
+      "No mappings resolved. Auto-population will not occur until mapX_* parameters are bound to this widget instance."
+    );
   }
 
   const input = document.getElementById("searchBox");
@@ -91,10 +90,6 @@ JFCustomWidget.subscribe("ready", function () {
 
   let entries = [];
   let selectedEntry = null;
-
-  function setStatus(msg) {
-    statusEl.textContent = msg || "";
-  }
 
   function resize() {
     JFCustomWidget.requestFrameResize({
@@ -106,10 +101,10 @@ JFCustomWidget.subscribe("ready", function () {
     return String(entry.flat[searchKey] ?? "");
   }
 
-  // ----------------------------------
+  // ==================================
   // Load JSON
-  // ----------------------------------
-  console.group("📡 Loading JSON");
+  // ==================================
+  console.group("Load JSON");
   fetch(jsonURL, { cache: "no-store" })
     .then(r => r.json())
     .then(json => {
@@ -117,7 +112,7 @@ JFCustomWidget.subscribe("ready", function () {
         ? json
         : Object.values(json).find(Array.isArray) || [];
 
-      console.log("Raw JSON record sample:", data[0]);
+      console.log("Sample record:", data[0]);
 
       entries = data.map(item => ({
         item,
@@ -129,13 +124,13 @@ JFCustomWidget.subscribe("ready", function () {
       resize();
     })
     .catch(err => {
-      console.error("❌ JSON LOAD FAILED", err);
+      console.error("JSON load failed", err);
       console.groupEnd();
     });
 
-  // ----------------------------------
+  // ==================================
   // Search
-  // ----------------------------------
+  // ==================================
   function search() {
     const q = input.value.trim().toLowerCase();
     if (q.length < minChars) return;
@@ -150,7 +145,6 @@ JFCustomWidget.subscribe("ready", function () {
 
   function renderList(list) {
     results.innerHTML = "";
-
     list.forEach(entry => {
       const div = document.createElement("div");
       div.className = "result";
@@ -158,18 +152,17 @@ JFCustomWidget.subscribe("ready", function () {
       div.onclick = () => selectEntry(entry);
       results.appendChild(div);
     });
-
     resize();
   }
 
-  // ----------------------------------
-  // Selection + FULL DIAGNOSTICS
-  // ----------------------------------
+  // ==================================
+  // Selection + Auto-population
+  // ==================================
   function selectEntry(entry) {
-    console.group("🎯 Selection Event");
+    console.group("Selection");
 
     const flat = entry.flat;
-    console.log("Selected flat record:", flat);
+    console.log("Selected record:", flat);
 
     const byQuestionId = [];
 
@@ -177,37 +170,33 @@ JFCustomWidget.subscribe("ready", function () {
       const value = flat[map.jsonKey];
 
       if (value === undefined) {
-        console.warn(`❌ JSON key missing: ${map.jsonKey}`);
+        console.warn(`JSON key not found: ${map.jsonKey}`);
         return;
       }
 
-      console.log(`✅ Mapping JSON → Field`, {
-        jsonKey: map.jsonKey,
-        value,
-        questionId: map.questionId,
-        domId: map.domId
-      });
+      console.log("Applying mapping:", map, value);
 
       byQuestionId.push({
         id: map.questionId,
         value: String(value)
       });
 
+      // DOM-level fallback (official pattern)
       try {
         JFCustomWidget.storeToField(map.domId, String(value));
-        console.log(`✔ storeToField executed for ${map.domId}`);
       } catch (e) {
-        console.error(`❌ storeToField failed for ${map.domId}`, e);
+        console.error("storeToField failed:", map.domId, e);
       }
     });
 
     console.log("Question-ID payload:", byQuestionId);
 
-    try {
-      JFCustomWidget.setFieldsValueById(byQuestionId);
-      console.log("✔ setFieldsValueById executed");
-    } catch (e) {
-      console.error("❌ setFieldsValueById threw error", e);
+    if (byQuestionId.length) {
+      try {
+        JFCustomWidget.setFieldsValueById(byQuestionId);
+      } catch (e) {
+        console.error("setFieldsValueById failed", e);
+      }
     }
 
     let returnValue;
@@ -215,40 +204,31 @@ JFCustomWidget.subscribe("ready", function () {
     else if (returnFormat === "flat") returnValue = flat;
     else returnValue = flat[idKey];
 
-    console.log("Widget return value:", returnValue);
     JFCustomWidget.sendData({ value: returnValue });
 
     selectedEntry = entry;
     input.value = displayLabel(entry);
-    setStatus("Selected");
     results.innerHTML = "";
+    resize();
 
     console.groupEnd();
-    resize();
   }
 
   input.addEventListener("input", debounce(search, 150));
 
-  // ----------------------------------
+  // ==================================
   // Submit
-  // ----------------------------------
+  // ==================================
   JFCustomWidget.subscribe("submit", function () {
-    console.group("📨 Submit Event");
-
     if (!selectedEntry) {
-      console.error("❌ Submit blocked: no selection");
       JFCustomWidget.sendSubmit({ valid: false, value: "" });
-      console.groupEnd();
       return;
     }
 
-    console.log("Submitting value:", selectedEntry.flat[idKey]);
     JFCustomWidget.sendSubmit({
       valid: true,
       value: selectedEntry.flat[idKey]
     });
-
-    console.groupEnd();
   });
 
   console.groupEnd();
