@@ -69,8 +69,15 @@ JFCustomWidget.subscribe("ready", function () {
   const minChars = Number(settings.minChars || 2);
   const returnFormat = (settings.returnFormat || "value").toLowerCase();
 
+  const input = document.getElementById("searchBox");
+  const results = document.getElementById("results");
+  const statusEl = document.getElementById("status");
+
   if (!jsonURL || !searchKey || !idKey) {
     console.error("Missing required widget settings");
+    statusEl.textContent =
+      "Widget configuration error: required settings missing.";
+    statusEl.style.color = "red";
     console.groupEnd();
     return;
   }
@@ -78,15 +85,13 @@ JFCustomWidget.subscribe("ready", function () {
   const FIELD_MAPPINGS = buildMappings(settings);
   console.log("Resolved mappings:", FIELD_MAPPINGS);
 
+  // 🔴 HARD GUARD: no mappings = no autopopulation
   if (!FIELD_MAPPINGS.length) {
-    console.warn(
-      "No mappings resolved. Auto-population will not occur until mapX_* parameters are bound to this widget instance."
-    );
+    console.error("No field mappings detected at runtime.");
+    statusEl.textContent =
+      "Configuration error: No field mappings detected. Please re-add the widget and re-save mapping parameters.";
+    statusEl.style.color = "red";
   }
-
-  const input = document.getElementById("searchBox");
-  const results = document.getElementById("results");
-  const statusEl = document.getElementById("status");
 
   let entries = [];
   let selectedEntry = null;
@@ -104,7 +109,6 @@ JFCustomWidget.subscribe("ready", function () {
   // ==================================
   // Load JSON
   // ==================================
-  console.group("Load JSON");
   fetch(jsonURL, { cache: "no-store" })
     .then(r => r.json())
     .then(json => {
@@ -120,12 +124,12 @@ JFCustomWidget.subscribe("ready", function () {
       }));
 
       console.log("Flattened keys:", Object.keys(entries[0]?.flat || {}));
-      console.groupEnd();
       resize();
     })
     .catch(err => {
       console.error("JSON load failed", err);
-      console.groupEnd();
+      statusEl.textContent = "Failed to load data source.";
+      statusEl.style.color = "red";
     });
 
   // ==================================
@@ -161,6 +165,12 @@ JFCustomWidget.subscribe("ready", function () {
   function selectEntry(entry) {
     console.group("Selection");
 
+    if (!FIELD_MAPPINGS.length) {
+      console.warn("Selection ignored: no mappings configured.");
+      console.groupEnd();
+      return;
+    }
+
     const flat = entry.flat;
     console.log("Selected record:", flat);
 
@@ -174,14 +184,12 @@ JFCustomWidget.subscribe("ready", function () {
         return;
       }
 
-      console.log("Applying mapping:", map, value);
-
       byQuestionId.push({
         id: map.questionId,
         value: String(value)
       });
 
-      // DOM-level fallback (official pattern)
+      // DOM-level fallback (Jotform-supported)
       try {
         JFCustomWidget.storeToField(map.domId, String(value));
       } catch (e) {
