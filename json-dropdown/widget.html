@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <script src="//js.jotform.com/JotFormCustomWidget.min.js"></script>
+
+  <link
+    rel="stylesheet"
+    href="https://cdn.jotfor.ms/themes/CSS/defaultV2.css"
+  />
+
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="form-line jf-modern">
+    <div class="form-input-wide">
+      <label class="form-label">Select an option</label>
+
+      <input
+        id="search"
+        class="form-textbox"
+        placeholder="Search…"
+        style="display:none; margin-bottom:6px;"
+      />
+
+      <div class="jf-select-wrapper">
+        <select id="dropdown" class="form-dropdown">
+          <option>Loading…</option>
+        </select>
+        <span class="jf-chevron"></span>
+      </div>
+    </div>
+  </div>
+
+  <div id="status" class="status"></div>
+
+  <script src="widget.js?v=3"></script>
+</body>
+</html>
