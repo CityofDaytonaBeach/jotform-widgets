@@ -25,32 +25,47 @@ function debounce(fn, delay = 150) {
 }
 
 // ==================================
-// Build mappings from widget settings
-// EXPECTS QUESTION IDs (e.g. "4")
+// Robust mapping extraction
 // ==================================
-function buildMappings(settings) {
+function extractMappings(settings) {
   const mappings = [];
+  const keys = Object.keys(settings);
 
-  for (let i = 1; i <= 10; i++) {
-    const jsonKey = settings[`map${i}_jsonKey`];
-    const qid = settings[`map${i}_fieldId`];
+  console.group("🔍 Mapping discovery");
+  console.log("All setting keys:", keys);
 
-    if (
-      !jsonKey ||
-      !qid ||
-      jsonKey === `map${i}_jsonKey` ||
-      qid === `map${i}_fieldId`
-    ) {
-      continue;
+  // Find all mapX_jsonKey entries dynamically
+  keys.forEach(k => {
+    const match = k.match(/^map(\d+)_jsonkey$/i);
+    if (!match) return;
+
+    const index = match[1];
+    const jsonKey = settings[k];
+    const fieldId =
+      settings[`map${index}_fieldId`] ||
+      settings[`map${index}_fieldid`];
+
+    if (!jsonKey || !fieldId) {
+      console.warn(`⚠️ Incomplete mapping at index ${index}`, {
+        jsonKey,
+        fieldId
+      });
+      return;
     }
 
     mappings.push({
-      jsonKey: jsonKey.trim(),
-      questionId: String(qid).trim(),
-      domId: `input_${String(qid).trim()}`
+      jsonKey: String(jsonKey).trim(),
+      questionId: String(fieldId).trim(),
+      domId: `input_${String(fieldId).trim()}`
     });
-  }
 
+    console.log(`✔ Mapping ${index} resolved`, {
+      jsonKey,
+      questionId: fieldId
+    });
+  });
+
+  console.groupEnd();
   return mappings;
 }
 
@@ -58,7 +73,7 @@ function buildMappings(settings) {
 // Widget Initialization
 // ==================================
 JFCustomWidget.subscribe("ready", function () {
-  console.group("Widget Init");
+  console.group("🧩 Widget Ready");
 
   const settings = JFCustomWidget.getWidgetSettings() || {};
   console.log("Settings received:", settings);
@@ -74,22 +89,21 @@ JFCustomWidget.subscribe("ready", function () {
   const statusEl = document.getElementById("status");
 
   if (!jsonURL || !searchKey || !idKey) {
-    console.error("Missing required widget settings");
+    console.error("❌ Missing required settings");
     statusEl.textContent =
-      "Widget configuration error: required settings missing.";
+      "Widget configuration error: jsonURL, searchKey, or idKey missing.";
     statusEl.style.color = "red";
     console.groupEnd();
     return;
   }
 
-  const FIELD_MAPPINGS = buildMappings(settings);
+  const FIELD_MAPPINGS = extractMappings(settings);
   console.log("Resolved mappings:", FIELD_MAPPINGS);
 
-  // 🔴 HARD GUARD: no mappings = no autopopulation
   if (!FIELD_MAPPINGS.length) {
-    console.error("No field mappings detected at runtime.");
+    console.error("❌ No mappings received at runtime");
     statusEl.textContent =
-      "Configuration error: No field mappings detected. Please re-add the widget and re-save mapping parameters.";
+      "Configuration error: No field mappings detected. Delete and re-add the widget, then re-save mapping fields.";
     statusEl.style.color = "red";
   }
 
@@ -127,7 +141,7 @@ JFCustomWidget.subscribe("ready", function () {
       resize();
     })
     .catch(err => {
-      console.error("JSON load failed", err);
+      console.error("❌ JSON load failed", err);
       statusEl.textContent = "Failed to load data source.";
       statusEl.style.color = "red";
     });
@@ -144,12 +158,8 @@ JFCustomWidget.subscribe("ready", function () {
       return v && String(v).toLowerCase().includes(q);
     });
 
-    renderList(filtered);
-  }
-
-  function renderList(list) {
     results.innerHTML = "";
-    list.forEach(entry => {
+    filtered.forEach(entry => {
       const div = document.createElement("div");
       div.className = "result";
       div.textContent = displayLabel(entry);
@@ -163,10 +173,10 @@ JFCustomWidget.subscribe("ready", function () {
   // Selection + Auto-population
   // ==================================
   function selectEntry(entry) {
-    console.group("Selection");
+    console.group("🎯 Selection");
 
     if (!FIELD_MAPPINGS.length) {
-      console.warn("Selection ignored: no mappings configured.");
+      console.warn("Selection aborted: no mappings available");
       console.groupEnd();
       return;
     }
@@ -174,37 +184,28 @@ JFCustomWidget.subscribe("ready", function () {
     const flat = entry.flat;
     console.log("Selected record:", flat);
 
-    const byQuestionId = [];
+    const payload = [];
 
     FIELD_MAPPINGS.forEach(map => {
       const value = flat[map.jsonKey];
-
       if (value === undefined) {
-        console.warn(`JSON key not found: ${map.jsonKey}`);
+        console.warn(`JSON key missing: ${map.jsonKey}`);
         return;
       }
 
-      byQuestionId.push({
+      payload.push({
         id: map.questionId,
         value: String(value)
       });
 
-      // DOM-level fallback (Jotform-supported)
-      try {
-        JFCustomWidget.storeToField(map.domId, String(value));
-      } catch (e) {
-        console.error("storeToField failed:", map.domId, e);
-      }
+      // DOM fallback
+      JFCustomWidget.storeToField(map.domId, String(value));
     });
 
-    console.log("Question-ID payload:", byQuestionId);
+    console.log("Question-ID payload:", payload);
 
-    if (byQuestionId.length) {
-      try {
-        JFCustomWidget.setFieldsValueById(byQuestionId);
-      } catch (e) {
-        console.error("setFieldsValueById failed", e);
-      }
+    if (payload.length) {
+      JFCustomWidget.setFieldsValueById(payload);
     }
 
     let returnValue;
