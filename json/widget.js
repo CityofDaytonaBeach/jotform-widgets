@@ -4,6 +4,7 @@
 function flatten(obj, prefix = "", out = {}) {
   for (const key in obj) {
     if (!Object.prototype.hasOwnProperty.call(obj, key)) continue;
+
     const val = obj[key];
     const path = prefix ? `${prefix}.${key}` : key;
 
@@ -25,47 +26,50 @@ function debounce(fn, delay = 150) {
 }
 
 // ==================================
-// Robust mapping extraction
+// Normalize mapping slots (1–10)
 // ==================================
 function extractMappings(settings) {
   const mappings = [];
-  const keys = Object.keys(settings);
 
-  console.group("🔍 Mapping discovery");
-  console.log("All setting keys:", keys);
+  for (let i = 1; i <= 10; i++) {
+    const rawJsonKey = settings[`map${i}_jsonKey`];
+    const rawFieldId = settings[`map${i}_fieldId`];
 
-  // Find all mapX_jsonKey entries dynamically
-  keys.forEach(k => {
-    const match = k.match(/^map(\d+)_jsonkey$/i);
-    if (!match) return;
+    const jsonKey =
+      rawJsonKey != null && String(rawJsonKey).trim() !== ""
+        ? String(rawJsonKey).trim()
+        : null;
 
-    const index = match[1];
-    const jsonKey = settings[k];
     const fieldId =
-      settings[`map${index}_fieldId`] ||
-      settings[`map${index}_fieldid`];
+      rawFieldId != null && String(rawFieldId).trim() !== ""
+        ? String(rawFieldId).trim()
+        : null;
 
-    if (!jsonKey || !fieldId) {
-      console.warn(`⚠️ Incomplete mapping at index ${index}`, {
-        jsonKey,
-        fieldId
-      });
-      return;
-    }
+    const isActive = Boolean(jsonKey && fieldId);
 
     mappings.push({
-      jsonKey: String(jsonKey).trim(),
-      questionId: String(fieldId).trim(),
-      domId: `input_${String(fieldId).trim()}`
-    });
-
-    console.log(`✔ Mapping ${index} resolved`, {
+      index: i,
       jsonKey,
-      questionId: fieldId
+      fieldId,
+      questionId: fieldId,
+      domId: fieldId ? `input_${fieldId}` : null,
+      isActive
     });
-  });
+  }
 
+  // Diagnostic visibility
+  console.group("📋 Normalized Mapping Slots");
+  mappings.forEach(m => {
+    console.log(
+      `Map ${m.index}: ${m.isActive ? "ACTIVE" : "inactive"}`,
+      {
+        jsonKey: m.jsonKey,
+        fieldId: m.fieldId
+      }
+    );
+  });
   console.groupEnd();
+
   return mappings;
 }
 
@@ -76,7 +80,7 @@ JFCustomWidget.subscribe("ready", function () {
   console.group("🧩 Widget Ready");
 
   const settings = JFCustomWidget.getWidgetSettings() || {};
-  console.log("Settings received:", settings);
+  console.log("Widget settings:", settings);
 
   const jsonURL = settings.jsonURL;
   const searchKey = (settings.searchKey || "").trim();
@@ -89,22 +93,22 @@ JFCustomWidget.subscribe("ready", function () {
   const statusEl = document.getElementById("status");
 
   if (!jsonURL || !searchKey || !idKey) {
-    console.error("❌ Missing required settings");
     statusEl.textContent =
-      "Widget configuration error: jsonURL, searchKey, or idKey missing.";
+      "Configuration error: jsonURL, searchKey, or idKey missing.";
     statusEl.style.color = "red";
+    console.error("Missing required settings");
     console.groupEnd();
     return;
   }
 
   const FIELD_MAPPINGS = extractMappings(settings);
-  console.log("Resolved mappings:", FIELD_MAPPINGS);
+  const ACTIVE_MAPPINGS = FIELD_MAPPINGS.filter(m => m.isActive);
 
-  if (!FIELD_MAPPINGS.length) {
-    console.error("❌ No mappings received at runtime");
+  if (!ACTIVE_MAPPINGS.length) {
     statusEl.textContent =
-      "Configuration error: No field mappings detected. Delete and re-add the widget, then re-save mapping fields.";
+      "Configuration error: No active field mappings defined.";
     statusEl.style.color = "red";
+    console.error("No active mappings");
   }
 
   let entries = [];
@@ -141,7 +145,7 @@ JFCustomWidget.subscribe("ready", function () {
       resize();
     })
     .catch(err => {
-      console.error("❌ JSON load failed", err);
+      console.error("JSON load failed", err);
       statusEl.textContent = "Failed to load data source.";
       statusEl.style.color = "red";
     });
@@ -166,6 +170,7 @@ JFCustomWidget.subscribe("ready", function () {
       div.onclick = () => selectEntry(entry);
       results.appendChild(div);
     });
+
     resize();
   }
 
@@ -175,8 +180,8 @@ JFCustomWidget.subscribe("ready", function () {
   function selectEntry(entry) {
     console.group("🎯 Selection");
 
-    if (!FIELD_MAPPINGS.length) {
-      console.warn("Selection aborted: no mappings available");
+    if (!ACTIVE_MAPPINGS.length) {
+      console.warn("Selection ignored: no active mappings");
       console.groupEnd();
       return;
     }
@@ -186,26 +191,31 @@ JFCustomWidget.subscribe("ready", function () {
 
     const payload = [];
 
-    FIELD_MAPPINGS.forEach(map => {
-      const value = flat[map.jsonKey];
-      if (value === undefined) {
-        console.warn(`JSON key missing: ${map.jsonKey}`);
-        return;
-      }
+    ACTIVE_MAPPINGS.forEach(m => {
+      const value = flat[m.jsonKey];
+      if (value == null) return;
 
       payload.push({
-        id: map.questionId,
+        id: m.questionId,
         value: String(value)
       });
 
-      // DOM fallback
-      JFCustomWidget.storeToField(map.domId, String(value));
+      // DOM-level fallback (Jotform-supported)
+      try {
+        JFCustomWidget.storeToField(m.domId, String(value));
+      } catch (e) {
+        console.error("storeToField failed:", m.domId, e);
+      }
     });
 
     console.log("Question-ID payload:", payload);
 
     if (payload.length) {
-      JFCustomWidget.setFieldsValueById(payload);
+      try {
+        JFCustomWidget.setFieldsValueById(payload);
+      } catch (e) {
+        console.error("setFieldsValueById failed", e);
+      }
     }
 
     let returnValue;
